@@ -1,109 +1,120 @@
 from roller import color
-from collections import namedtuple
 import pygame
 import numpy as np
 import math
-# Define the named tuple for an xy coordinate
-Point = namedtuple('Point', ['x', 'y'])
+from roller.calculations import get_line_pixels, get_line_endpoint, screen2world
+from roller.datatypes import Point
 
-def get_line_pixels(start: Point, end: Point):
-    """Returns a list of (x, y) coordinates of all pixels along the line from (x0, y0) to (x1, y1).
-    This should be an implementation of Bresenham's algorithm"""
-    x0 = start.x
-    y0 = start.y
-    x1 = end.x
-    y1 = end.y
+class Sensor:
+    def __init__(self, power_draw):
+        self.power_draw = power_draw        # Power usage of the sensor
+        self.is_enabled = True             # Whether the sensor is active
+        self.temperature = 20               # Current temperature of the sensor
 
-    pixels = []
-    
-    dx = abs(x1 - x0)
-    dy = abs(y1 - y0)
-    sx = 1 if x0 < x1 else -1
-    sy = 1 if y0 < y1 else -1
-    err = dx - dy
+    def enable(self):
+        """Enable the sensor."""
+        self.is_enabled = True
+        print(f"{self.__class__.__name__} enabled.")
 
-    while True:
-        pixels.append(Point(int(x0), int(y0)))  # Store the current pixel coordinates
-        if (abs(x0 - x1) < 1) and (abs(y0- y1) < 1):
-            break
-        e2 = 2 * err
-        if e2 > -dy:
-            err -= dy
-            x0 += sx
-        if e2 < dx:
-            err += dx
-            y0 += sy
-    
-    return pixels
+    def toggle(self):
+        self.is_enabled = not self.is_enabled
+        print(f"{self.__class__.__name__} toggled.")
+        
+    def disable(self):
+        """Disable the sensor."""
+        self.is_enabled = False
+        print(f"{self.__class__.__name__} disabled.")
 
-def is_ground_color(color):
-    if ((color[0] < 15) and
-        (color[1] < 15) and
-        (color[2] < 15)
-    ):
-        return True
-    else:
-        return False
+    def get_status(self):
+        """Return sensor's status."""
+        return {
+            "power_draw": self.power_draw,
+            "is_enabled": self.is_enabled,
+            "temperature": self.temperature
+        }
 
-def get_line_endpoint(start: Point, distance:float, angle:float):
-    # Calculate new coordinates using trigonometry
-    x2 = start.x + distance * math.cos(angle)
-    y2 = start.y + distance * math.sin(angle)
-    return Point(x2, y2)
-
-
-def passive_sonar():
-    pass
-
-def active_sonar():
-    pass
-
-def motion_detection():
-    pass
-
-def ground_penetrating_radar():
-    pass
-
-def gpx_trail(world, screen, player):
-    # origin a xy cooridinate in reference to the 0,0 corner of the world surface.
-    origin = Point(player.x - world.x, player.y - world.y)
-    pygame.draw.circle(world.memory, color.gray, origin, 1) 
-
-def screen2world(screen_point:Point, world):
-    return Point(screen_point.x - world.x, screen_point.y - world.y)
+    def run(self):
+        """This method will be implemented in specific sensor subclasses."""
+        raise NotImplementedError("run must be implemented in subclasses.")
 
 
 
-def lidar(world, screen, player):
-    origin = screen2world(player, world)
-    lidar_range = 400
-    lidar_samples = 40
-    lidar_shows_lines = True
-    
-    for theta in np.linspace(0, 2*math.pi, num=lidar_samples):
-        # We calculat the world coordinate to which the lidat ray will travel
-        end_point = get_line_endpoint(origin, lidar_range, theta)
-        # origin and endpoint are now in world coordinates
-        # pygame.draw.line(world.interpretation, color.accent_blue, origin, end_point, 1)
+# Specific sensor classes inheriting from the base Sensor class
+class SingleLaser(Sensor):
+    def __init__(self, power_draw=1, range = 1000, color = color.cyan, mount_angle = 0):
+            # Call the base class constructor
+            super().__init__(power_draw)
+            # LIDAR-specific attribute
+            self.range = range
+            self.color = color
+            self.shows_ray = True
+            self.mount_angle = mount_angle
 
-        # we get a list of coordinate points from the player's position
-        # we are operating in world coordinates
-        ray_points = get_line_pixels(origin, end_point)
+    def run(self, player, world):
+        if self.is_enabled:
 
-        for point in ray_points:
-            pixel_color = world.surface.get_at(point)
-            if is_ground_color(pixel_color):
-                pygame.draw.circle(world.interpretation, color.lidar, point, 1)  # Clear circle with full transparency
-                if lidar_shows_lines:
-                    pygame.draw.line(world.interpretation, color.lidar + (30,), origin, point, 1)
-                break
+            origin = screen2world(player, world)
+            end_point = get_line_endpoint(origin, self.range, self.mount_angle + player.phi)
+            ray_points = get_line_pixels(origin, end_point)
 
-    return
+            for point in ray_points:
+                pixel_color = world.surface.get_at(point)
+                if color.is_ground_color(pixel_color):
+                    pygame.draw.circle(world.interpretation, self.color, point, 1)  # Clear circle with full transparency
+                    if self.shows_ray:
+                        pygame.draw.line(world.interpretation, self.color + (30,), origin, point, 1)
+                    break
 
 
-def fog_of_war(world, screen, player):
+class LIDAR(Sensor):
 
-    reveal_radius = 100  # Radius of the revealed area around the player
-    # world.interpretation.fill((0, 0, 0, 250))  # Refill fog (reset)
-    pygame.draw.circle(world.interpretation, (0, 0, 0, 0), (player.x, player.y), reveal_radius)  # Clear circle with full transparency
-    return
+    def __init__(self, range = 300, laser_count = 30,color = color.green,):
+        # Call the base class constructor
+        super().__init__(power_draw = laser_count)
+        # LIDAR-specific attribute
+        self.range = range
+        self.color = color
+        self.shows_ray = True
+        self.laser_count = laser_count
+
+    def run(self, player, world):
+        if self.is_enabled:
+            origin = screen2world(player, world)
+   
+            for theta in np.linspace(0, 2*math.pi, num=self.laser_count):
+                # We calculat the world coordinate to which the lidat ray will travel
+                end_point = get_line_endpoint(origin, self.range, theta)
+                # origin and endpoint are now in world coordinates
+                # pygame.draw.line(world.interpretation, color.accent_blue, origin, end_point, 1)
+
+                # we get a list of coordinate points from the player's position
+                # we are operating in world coordinates
+                ray_points = get_line_pixels(origin, end_point)
+
+                for point in ray_points:
+                    pixel_color = world.surface.get_at(point)
+                    if color.is_ground_color(pixel_color):
+                        pygame.draw.circle(world.interpretation, self.color, point, 1)  # Clear circle with full transparency
+                        if self.shows_ray:
+                            pygame.draw.line(world.interpretation, self.color + (30,), origin, point, 1)
+                        break
+
+class GPS_surface_mount(Sensor):
+    def run(self, player, world):
+        if self.is_enabled:
+            origin = screen2world(player, world)
+            sensor_location = get_line_endpoint(origin, player.r, player.phi)
+            pygame.draw.circle(world.memory, color.cyan, sensor_location, 1) 
+
+class GPS_stabilized(Sensor):
+    def run(self, player, world):
+        if self.is_enabled:
+            origin = screen2world(player, world)
+            pygame.draw.circle(world.memory, color.gpx, origin, 1) 
+
+class Sonar(Sensor):
+    def run(self, player, world):
+        if self.is_enabled:
+            print("Sonar is emitting sound waves to detect objects.")
+        else:
+            print("Sonar is disabled.")

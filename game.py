@@ -2,21 +2,23 @@ import pygame
 from pygame.locals import *
 from dataclasses import dataclass
 import math
-
+import numpy as np
 from roller import sensors
 from roller.sensors import Point
+from roller.calculations import vectorProjection, scalarProduct
+from roller import color
+from typing import List
 
 config = {
     "fps": 60,
     "gravity_acceleration": 0.2, # acceleration in pixels / second^2
     "height": 0,
     "width": 0,
-    "debug": True,
+    "debug": False,
 }
 
-
 @dataclass
-class Player:
+class Spherebot:
     x: float
     y: float
     vy: float
@@ -27,6 +29,7 @@ class Player:
     collisionDirectionX: float  # collision direction provides direction of the collision force vector
     collisionDirectionY: float
     pixelMinDistance: float
+    sensors: List[sensors.Sensor]
     color: tuple = (70,70,70)
     accent_color: tuple = (0,128,255)
     friction: float = 1
@@ -37,27 +40,8 @@ class World:
     surface: pygame.surface.Surface
     interpretation: pygame.surface.Surface
     memory: pygame.surface.Surface
-    x: float = 0
+    x: float = 0  # screen coordinates of the top-right corner
     y: float = 0
-
-
-def scalarProduct(ax, ay, bx, by):
-    return ax*bx + ay*by;
-
-def vectorProjection(ax, ay, bx, by):
-    coef = scalarProduct(ax, ay, bx, by) / scalarProduct(bx, by, bx, by);
-    return [coef * bx, coef * by];
-
-
-def execute_tick():
-    worldEdgeCheck()
-    drawWorld()
-    if (touch()):
-        collide();
-        rotate(player);
-    move();
-    drawPlayer(player);
-
 
 
 """checks the location of the player and moves the view
@@ -86,14 +70,49 @@ def worldEdgeCheck():
         world.y -= player.y - (center_y-y_pad);
         player.y = (center_y-y_pad);
     
+
+# Apply a multiplication function to every pixel (e.g., reduce brightness)
+def adjust_brightness(pixels, factor):
+    # Multiply every pixel value by the factor, and clamp to [0, 255]
+    pixels = pixels*fa
+
+LAST_MEMORY_UPDATE_TIME = 0
+LAST_INTERPRETATION_UPDATE_TIME = 0
 def drawWorld():
     # Drawing
-    screen.fill((0, 0, 0))  # Fill the screen with black
-    # screen.blit(world.surface, (world.x, world.y))
-    world.interpretation.fill((0,0,0,0))
-    sensors.gpx_trail(world, screen, player)
-    sensors.lidar(world, screen, player)
-    # sensors.fog_of_war(world, screen, player)
+    global LAST_MEMORY_UPDATE_TIME
+    global LAST_INTERPRETATION_UPDATE_TIME
+
+    # Fill the screen with black
+    screen.fill((0, 0, 0))
+
+    if config['debug']:
+        screen.blit(world.surface, (world.x, world.y))
+
+    # world.interpretation.fill((0,0,0,0))
+
+    if CURRENT_TICK - LAST_INTERPRETATION_UPDATE_TIME > 1000:
+        LAST_INTERPRETATION_UPDATE_TIME = CURRENT_TICK
+        # Get the pixel array from the surface
+        # and apply brightness reduction to "forget" past sensor data
+        pixels = pygame.surfarray.pixels3d(world.interpretation)  # For RGB surfaces
+        pixels >>= 1
+        del pixels
+
+    if CURRENT_TICK - LAST_MEMORY_UPDATE_TIME > 20000:
+        LAST_MEMORY_UPDATE_TIME = CURRENT_TICK
+        # Get the pixel array from the surface
+        # and apply brightness reduction to "forget" past sensor data
+        pixels = pygame.surfarray.pixels3d(world.memory)  # For RGB surfaces
+        pixels >>= 1
+        del pixels
+
+    # sensors.gpx_calibrated(world, player)
+    # sensors.gpx_surface_mount(world, player)
+    # sensors.lidar(world, player)
+    # sensors.single_laser(world, player)
+    for sensor in player.sensors:
+        sensor.run(player, world)
 
     screen.blit(world.memory, (world.x, world.y))
     screen.blit(world.interpretation, (world.x, world.y))
@@ -148,9 +167,6 @@ def touch():
         return True;
     else:
         return False;
-    
-
-
 
 def collide():
     #pop player onto surface
@@ -164,7 +180,6 @@ def collide():
     # values near 1: fully dampened collision
     player.vx -= (1.5 * velocity_change[0]);
     player.vy -= (1.5 * velocity_change[1]);
-
 
 def rotate(player):
     
@@ -214,7 +229,7 @@ def move():
     player.y += player.vy;
 
 
-def drawPlayer(player: Player):
+def drawPlayer(player: Spherebot):
     # main body of the player
     pygame.draw.circle(screen, player.color, (player.x,player.y), player.r)
 
@@ -238,6 +253,55 @@ def drawPlayer(player: Player):
         pygame.draw.circle(screen, (255,128,0), collsion_center_xy, 2)
 
 
+def handle_events(player):
+    global RUNNING
+    for event in pygame.event.get():
+
+        if event.type == pygame.QUIT:
+            RUNNING = False
+
+        # Check for key presses to toggle sensors
+
+        if event.type == pygame.KEYDOWN:
+        
+            sensor_count = len(player.sensors)
+            if event.key == pygame.K_1 and sensor_count > 0:
+                player.sensors[0].toggle()
+            elif event.key == pygame.K_2 and sensor_count > 1:
+                player.sensors[1].toggle()
+            elif event.key == pygame.K_3 and sensor_count > 2:
+                player.sensors[2].toggle()
+            elif event.key == pygame.K_4 and sensor_count > 3:
+                player.sensors[3].toggle()
+            elif event.key == pygame.K_5 and sensor_count > 4:
+                player.sensors[4].toggle()
+            elif event.key == pygame.K_6 and sensor_count > 5:
+                player.sensors[5].toggle()
+            elif event.key == pygame.K_7 and sensor_count > 6:
+                player.sensors[6].toggle()
+            elif event.key == pygame.K_8 and sensor_count > 7:
+                player.sensors[7].toggle()
+            elif event.key == pygame.K_9 and sensor_count > 8:
+                player.sensors[8].toggle()
+            elif event.key == pygame.K_0 and sensor_count > 9:
+                player.sensors[9].toggle()
+    
+
+            elif event.key == pygame.K_ESCAPE:  # Exit fullscreen on ESC key press
+                RUNNING = False
+
+
+def execute_tick():
+    handle_events(player)
+    worldEdgeCheck()
+    drawWorld()
+    if (touch()):
+        collide();
+        rotate(player);
+    move();
+    drawPlayer(player);
+
+
 
 
 if __name__ == "__main__":
@@ -259,7 +323,7 @@ if __name__ == "__main__":
     world_surface = pygame.image.load('roller/assets/map3.png').convert()
 
     world = World(
-        x=700 , 
+        x=700, 
         y=400,
         surface = world_surface,
         interpretation = pygame.Surface(world_surface.get_size(), pygame.SRCALPHA),
@@ -268,7 +332,7 @@ if __name__ == "__main__":
 
     world.memory.fill((0,0,0,0))
 
-    player = Player(
+    player = Spherebot(
         x = config['width']/2,  # screen coordinates
         y = config['height']/2, 
         vy = 0,
@@ -279,16 +343,28 @@ if __name__ == "__main__":
         friction = 1,
         collisionDirectionX = 1,
         collisionDirectionY = 1,
-        pixelMinDistance = 20 # whould be <= player.r
+        pixelMinDistance = 20, # whould be <= player.r
+        sensors = [
+            sensors.LIDAR(color = color.lidar),
+            sensors.LIDAR(color = color.green),
+            sensors.GPS_surface_mount(power_draw = 1),
+            sensors.SingleLaser(range = 400, mount_angle=math.pi*1.5, color=color.orange),
+            sensors.SingleLaser(range = 400, mount_angle=math.pi*1.0, color=color.orange),
+            sensors.SingleLaser(range = 400, mount_angle=math.pi*0.5, color=color.orange),
+            sensors.SingleLaser(range = 400, mount_angle=math.pi*0, color=color.orange),
+        ],
     );
 
+    CURRENT_TICK = 0
+    PREVIOUS_TICK = 0
     # Game loop
-    running = True
-    while running:
+    RUNNING = True
+    while RUNNING:
         # Event handling
-        for event in pygame.event.get():
-            if event.type == QUIT:
-                running = False
+
+        PREVIOUS_TICK = CURRENT_TICK
+        CURRENT_TICK = pygame.time.get_ticks()
+
         # (draw your game objects here)
         execute_tick()
 
