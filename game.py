@@ -3,12 +3,15 @@ from pygame.locals import *
 from dataclasses import dataclass
 import math
 
+from roller import sensors
+from roller.sensors import Point
+
 config = {
     "fps": 60,
     "gravity_acceleration": 0.2, # acceleration in pixels / second^2
-    "height": 1000,
-    "width": 1600,
-    "debug": False,
+    "height": 0,
+    "width": 0,
+    "debug": True,
 }
 
 
@@ -31,7 +34,9 @@ class Player:
 
 @dataclass
 class World:
-    image: pygame.surface.Surface
+    surface: pygame.surface.Surface
+    interpretation: pygame.surface.Surface
+    memory: pygame.surface.Surface
     x: float = 0
     y: float = 0
 
@@ -84,14 +89,23 @@ def worldEdgeCheck():
 def drawWorld():
     # Drawing
     screen.fill((0, 0, 0))  # Fill the screen with black
-    screen.blit(world.image, (world.x, world.y))
+    # screen.blit(world.surface, (world.x, world.y))
+    world.interpretation.fill((0,0,0,0))
+    sensors.gpx_trail(world, screen, player)
+    sensors.lidar(world, screen, player)
+    # sensors.fog_of_war(world, screen, player)
+
+    screen.blit(world.memory, (world.x, world.y))
+    screen.blit(world.interpretation, (world.x, world.y))
+
 
 
 def touch():
     # Loop through the pixels around the player
+    origin = Point(player.x - world.x, player.y - world.y)
     r = math.floor(player.r)
-    x = math.floor(player.x)
-    y = math.floor(player.y)
+    x = math.floor(origin.x)
+    y = math.floor(origin.y)
     pixelSumX = 0
     pixelSumY =  0
     pixelsHit = 0
@@ -103,11 +117,9 @@ def touch():
             pixel_x = x + dx
             pixel_y = y + dy
             pixelDistance = math.sqrt(dx**2 + dy**2) # pythagoras
-            # color = world.image.get_at((pixel_x, pixel_y))
 
-            # check pixel values from the screen itself
-            screen_surface = pygame.display.get_surface()
-            color = screen_surface.get_at((pixel_x, pixel_y))
+            # check pixel values from the world surface itself
+            color = world.surface.get_at((pixel_x, pixel_y))
             if (
                 (color[0] < 15) and
                 (color[1] < 15) and
@@ -147,8 +159,11 @@ def collide():
 
     # change velocity direction
     velocity_change = vectorProjection(player.vx, player.vy, player.collisionDirectionX, player.collisionDirectionY);
-    player.vx -= (1.6 * velocity_change[0]);
-    player.vy -= (1.6 * velocity_change[1]);
+    # for a fully elastic bounce, use the multiplication factor 2
+    # values over 2: increases velocity on bounce
+    # values near 1: fully dampened collision
+    player.vx -= (1.5 * velocity_change[0]);
+    player.vy -= (1.5 * velocity_change[1]);
 
 
 def rotate(player):
@@ -232,22 +247,29 @@ if __name__ == "__main__":
     pygame.init()
 
     # Set up the game window
-    screen = pygame.display.set_mode((config['width'], config['height']))
-    pygame.display.set_caption('2D Side Roller')
+    # screen = pygame.display.set_mode((config['width'], config['height']))
+    screen = pygame.display.set_mode((0,0), pygame.FULLSCREEN)
+
+    config['width'] = pygame.display.Info().current_w
+    config['height'] = pygame.display.Info().current_h
 
     # Set up the game clock
     clock = pygame.time.Clock()
 
+    world_surface = pygame.image.load('roller/assets/map3.png').convert()
 
     world = World(
-        x=400, 
-        y=-100,
-        image = pygame.image.load('map3.png').convert()
+        x=700 , 
+        y=400,
+        surface = world_surface,
+        interpretation = pygame.Surface(world_surface.get_size(), pygame.SRCALPHA),
+        memory = pygame.Surface(world_surface.get_size(), pygame.SRCALPHA),
     )
 
- 
+    world.memory.fill((0,0,0,0))
+
     player = Player(
-        x = config['width']/2, 
+        x = config['width']/2,  # screen coordinates
         y = config['height']/2, 
         vy = 0,
         vx = 0,
@@ -267,12 +289,6 @@ if __name__ == "__main__":
         for event in pygame.event.get():
             if event.type == QUIT:
                 running = False
-
-
-        # player.x += 1   
-        print(player)
-
-
         # (draw your game objects here)
         execute_tick()
 
