@@ -14,7 +14,7 @@ class Overlay:
         pygame.font.init()
 
         PressStart2P = "roller/assets/fonts/PressStart2P/PressStart2P-Regular.ttf"
-        self.font = pygame.font.SysFont('monospace', self.font_size)
+        # self.font = pygame.font.SysFont('monospace', self.font_size)
         self.font = pygame.font.SysFont('ubuntu mono', self.font_size)
         # self.font = pygame.font.SysFont(PressStart2P, self.font_size)
 

@@ -6,12 +6,15 @@ from dataclasses import dataclass, field
 from roller.datatypes import Point
 from roller.colors import is_ground_color
 from roller import colors
-from roller.calculations import vectorProjection, screen2world
+from roller.calculations import vectorProjection, screen2world, clip
 from roller.sensors import SpectraScan_SX30, Sensor
+from roller.conditions import g_player_conditions
 import pygame
 
 @dataclass
 class Spherebot:
+    """Introducing the SphereBot-1000 - Your go-to spherical robotics platform that gets the job done, no frills attached. Whether you're mapping caves, patrolling perimeters, or just rolling around, the SphereBot-1000 delivers reliable performance for all your basic robotics needs. Built to last, easy to maintain, and ready to tackle whatever task you throw at it (within reason, of course)."""
+    
     x: float # world coordinates
     y: float # world coordinates
     vy: float = 0
@@ -59,6 +62,10 @@ class Spherebot:
                 self.omega += (-1 - self.omega) * 0.1
             if keys[self.keybinds['right']]:
                 self.omega += (1-self.omega) * 0.1
+
+        if g_player_conditions["your body is damaged and can only move slowly"]:
+            self.omega = clip(self.omega, min=-0.1, max = 0.1)
+
 
         # friction
         self.vy *= 0.99;

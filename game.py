@@ -10,6 +10,8 @@ from roller.spherebot import Spherebot
 from roller.overlay import Overlay
 from roller import colors
 from typing import List
+from roller.conditions import g_player_conditions
+
 
 config = {
     "fps": 60,
@@ -70,40 +72,45 @@ def drawWorld():
     if config['debug']:
         screen.blit(world.surface, (world.x, world.y))
 
-    if g_current_tick_ms - LAST_INTERPRETATION_UPDATE_TIME > 1000:
-        LAST_INTERPRETATION_UPDATE_TIME = g_current_tick_ms
-        # Get the pixel array from the surface
-        # and apply brightness reduction to "forget" past sensor data
-        pixels = pygame.surfarray.pixels3d(world.interpretation)  # For RGB surfaces
-        pixels >>= 1
-        del pixels
+    if g_player_conditions["you have a memory bank for sensor data"]:
+            
+        if g_current_tick_ms - LAST_INTERPRETATION_UPDATE_TIME > 1000:
+            LAST_INTERPRETATION_UPDATE_TIME = g_current_tick_ms
+            # Get the pixel array from the surface
+            # and apply brightness reduction to "forget" past sensor data
+            pixels = pygame.surfarray.pixels3d(world.interpretation)  # For RGB surfaces
+            pixels >>= 1
+            del pixels
 
-    if g_current_tick_ms - LAST_MEMORY_UPDATE_TIME > 20000:
-        LAST_MEMORY_UPDATE_TIME = g_current_tick_ms
-        # Get the pixel array from the surface
-        # and apply brightness reduction to "forget" past sensor data
-        pixels = pygame.surfarray.pixels3d(world.memory)  # For RGB surfaces
-        pixels >>= 1
-        del pixels
+        if g_current_tick_ms - LAST_MEMORY_UPDATE_TIME > 20000:
+            LAST_MEMORY_UPDATE_TIME = g_current_tick_ms
+            # Get the pixel array from the surface
+            # and apply brightness reduction to "forget" past sensor data
+            pixels = pygame.surfarray.pixels3d(world.memory)  # For RGB surfaces
+            pixels >>= 1
+            del pixels
+    else:
+        world.interpretation.fill((0,0,0,0))
 
-    # sensors.gpx_calibrated(world, player)
-    # sensors.gpx_surface_mount(world, player)
-    # sensors.lidar(world, player)
-    # sensors.single_laser(world, player)
     for sensor in player.sensors:
         sensor.run(player, world)
     
     # for sensor in friend.sensors:
     #     sensor.run(friend, world)
-
-    screen.blit(world.memory, (world.x, world.y))
+    if g_player_conditions["you have a memory bank for sensor data"]:
+        screen.blit(world.memory, (world.x, world.y))
     screen.blit(world.interpretation, (world.x, world.y))
 
 
 
 def drawSpherebot(bot: Spherebot):
     # main body of the bot
+    if bot.has_camera and not g_player_conditions['you are aware you are a robot']:
+        # we don't render the bot until it has become aware that it is a bot
+        return
+
     origin = Point(0,0)
+
     if bot.has_camera:
         origin = Point(bot.x,bot.y)
     else:
@@ -189,9 +196,12 @@ def execute_tick():
                 g_ambient_temperature,
                 (g_current_tick_ms - g_previous_tick_ms) / 1000
             )
-
-    drawSpherebot(player);
-    drawSpherebot(friend);
+    
+    if ["you are aware you are a robot"] == True:
+        drawSpherebot(player);
+        drawSpherebot(friend);
+    else:
+        drawSpherebot(Spherebot(radius= 5, color= colors.Cyberpunk.white, x=player.x, y = player.y))
 
     for entity in g_entities:
         if entity.has_camera:
@@ -217,8 +227,7 @@ if __name__ == "__main__":
     clock = pygame.time.Clock()
 
 
-
-    world_surface = pygame.image.load('roller/assets/map3.png').convert()
+    world_surface = pygame.image.load('roller/assets/map4.png').convert()
 
     world = World(
         x=700, 
@@ -245,10 +254,11 @@ if __name__ == "__main__":
         friction = 1,
         color = palette.dark,
         sensors = [
-            sensors.SpectraScan_SX30(color = palette.blue),
-            sensors.SpectraScan_LX1(color = palette.blue),
-            sensors.NAV1_InertiaCore(color = palette.pink),
-            sensors.NAV1_GyroSphere(color = palette.yellow),
+            sensors.FOTIRS(),
+            sensors.SpectraScan_SX30(color = palette.blue).disable() ,
+            sensors.SpectraScan_LX1(color = palette.blue).disable() ,
+            sensors.NAV1_InertiaCore(color = palette.pink).disable() ,
+            sensors.NAV1_GyroSphere(color = palette.yellow).disable(),
 
         ],
         keybinds = {

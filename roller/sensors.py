@@ -5,7 +5,19 @@ import math
 from roller.calculations import get_line_pixels, get_line_endpoint, screen2world
 from roller.datatypes import Point
 
+import random
 
+
+def get_first_solid_pixel(origin, max_range, theta, world):
+    # the pixel coordinates at max_range from origin in direction theta
+    end_point = get_line_endpoint(origin, max_range, theta)
+    # coordinates for all pixels along the ray
+    ray_points = get_line_pixels(origin, end_point)
+    for point in ray_points:
+        pixel_color = world.surface.get_at(point)
+        if colors.is_ground_color(pixel_color):
+            return point
+    return None
 
 
 class Sensor:
@@ -75,6 +87,9 @@ class Sensor:
 
 # Specific sensor classes inheriting from the base Sensor class
 class SpectraScan_LX1(Sensor):
+    
+    marketing_copy = """Meet the SpectraScan-LX1, the ultimate single-ray laser range finder, born from a sphere-whacking club-wielding human sport eqpuipment that’s been reverse-engineered, reimagined, and perfected for your everyday robotics sensing needs. 
+    """
     power_draw = 2
     def __init__(self, range = 1000, color = colors.cyan, mount_angle = 0):
             # Call the base class constructor
@@ -102,6 +117,8 @@ class SpectraScan_LX1(Sensor):
 
 
 class SpectraScan_SX30(Sensor):
+
+    marketing_copy = """Meet the SpectraScan-SX30 - your answer to getting lost and running into things! We took thirty of our trusty LX1 rangefinders, packed them into one powerful sensor array, and called it a day. Well... almost. Turns out, cramming that much tech makes it run a little toasty, we had to dial back the range a bit. But hey, it’s still a game-changer for up-close precision."""
 
     def __init__(self, range = 300, laser_count = 30,color = colors.green,):
         # Call the base class constructor
@@ -133,6 +150,27 @@ class SpectraScan_SX30(Sensor):
                         if self.shows_ray:
                             pygame.draw.line(world.interpretation, self.color + (30,), origin, point, 1)
                         break
+
+
+
+class FOTIRS(Sensor):
+    """Introducing the Forward-Emitting Optical Terrain Illumination and Reflectivity Sensor (FOTIRS)—a precision-engineered light-based sensor designed to project a controlled beam forward and downward, scanning the terrain ahead for optimal navigation and environmental awareness."""
+    def __init__(self):
+        super().__init__()
+        self.color = colors.Cyberpunk.white
+
+    def run(self, bot, world):
+        if self.is_enabled == False:
+            return;
+
+        origin = screen2world(bot, world)
+
+        for theta in np.linspace(0, math.pi, num=100):
+            point = get_first_solid_pixel(origin, 200, theta, world)
+            if point != None:
+                pygame.draw.circle(world.interpretation, self.color, point, 1)
+
+
 
 class NAV1_InertiaCore(Sensor):
     def run(self, player, world):

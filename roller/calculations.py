@@ -46,6 +46,16 @@ def get_line_endpoint(start: Point, distance:float, angle:float):
     return Point(x2, y2)
 
 
+def clip(value, min, max):
+    """return `value` unless it's outside the min/max boundary. If outside, return the boundary value instead"""
+    if value < min:
+        value = min
+    if value > max:
+        value = max
+
+    return value
+
+
 def screen2world(screen_point:Point, world):
     return Point(screen_point.x - world.x, screen_point.y - world.y)
 
