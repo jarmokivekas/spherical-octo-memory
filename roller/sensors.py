@@ -5,12 +5,30 @@ import math
 from roller.calculations import get_line_pixels, get_line_endpoint, screen2world
 from roller.datatypes import Point
 
+
+
+
 class Sensor:
-    def __init__(self, power_draw = 1, color = colors.cyan):
-        self.power_draw = power_draw        # Power usage of the sensor
+
+    # Power and temperature attributes
+    temperature = 20     # Current temperature of the sensor
+    power_draw = 1       # Watts
+    mass = 0.2           # m, Assumed mass in kg
+    heat_capacity = 900  # Assumed specific heat capacity in J/(kg*K)
+    heat_dissipation_rate = 0.1  # Example dissipation rate
+
+    def __init__(self, color = colors.cyan):
         self.is_enabled = True             # Whether the sensor is active
-        self.temperature = 20               # Current temperature of the sensor
         self.color = color
+        self.model = self.__class__.__name__
+
+    def get_housekeeping(self):
+        return dict(
+            model = self.model,
+            is_enabled = self.is_enabled,
+            temperature = round(self.temperature, 1),
+        )
+
     def enable(self):
         """Enable the sensor."""
         self.is_enabled = True
@@ -40,14 +58,28 @@ class Sensor:
         """This method will be implemented in specific sensor subclasses."""
         raise NotImplementedError("run must be implemented in subclasses.")
 
+    def update_temperature(self, ambient_temperature, dt):
+        # Calculate heat generated
+        
+        heat_generated = self.power_draw * dt if self.is_enabled else 0
+        
+        # Calculate heat loss
+        heat_loss = self.heat_dissipation_rate * (self.temperature - ambient_temperature) * dt
+        
+        # Calculate net heat change
+        net_heat_change = heat_generated - heat_loss
+        
+        # Update sensor temperature
+        self.temperature += net_heat_change / (self.mass * self.heat_capacity)
 
 
 # Specific sensor classes inheriting from the base Sensor class
-class SingleLaser(Sensor):
-    def __init__(self, power_draw=1, range = 1000, color = colors.cyan, mount_angle = 0):
+class SpectraScan_LX1(Sensor):
+    power_draw = 2
+    def __init__(self, range = 1000, color = colors.cyan, mount_angle = 0):
             # Call the base class constructor
-            super().__init__(power_draw =power_draw, color = color)
-            # LIDAR-specific attribute
+            super().__init__(color = color)
+            # SpectraScan_SX30-specific attribute
             self.range = range
             self.shows_ray = True
             self.mount_angle = mount_angle
@@ -64,17 +96,18 @@ class SingleLaser(Sensor):
                 if colors.is_ground_color(pixel_color):
                     pygame.draw.circle(world.interpretation, self.color, point, 1)  # Clear circle with full transparency
                     if self.shows_ray:
-                        # the range on the single laser if higer than LIDAR, so the ray is more opaque
+                        # the range on the single laser if higer than SpectraScan_SX30, so the ray is more opaque
                         pygame.draw.line(world.interpretation, self.color + (60,), origin, point, 2)
                     break
 
 
-class LIDAR(Sensor):
+class SpectraScan_SX30(Sensor):
 
     def __init__(self, range = 300, laser_count = 30,color = colors.green,):
         # Call the base class constructor
-        super().__init__(power_draw = laser_count, color = color)
-        # LIDAR-specific attribute
+        super().__init__(color = color)
+        # SpectraScan_SX30-specific attribute
+        self.power_draw = laser_count
         self.range = range
         self.shows_ray = True
         self.laser_count = laser_count
@@ -101,14 +134,14 @@ class LIDAR(Sensor):
                             pygame.draw.line(world.interpretation, self.color + (30,), origin, point, 1)
                         break
 
-class GPS_surface_mount(Sensor):
+class NAV1_InertiaCore(Sensor):
     def run(self, player, world):
         if self.is_enabled:
             origin = screen2world(player, world)
             sensor_location = get_line_endpoint(origin, player.radius, player.phi)
             pygame.draw.circle(world.memory, self.color, sensor_location, 1) 
 
-class GPS_stabilized(Sensor):
+class NAV1_GyroSphere(Sensor):
     def run(self, player, world):
         if self.is_enabled:
             origin = screen2world(player, world)

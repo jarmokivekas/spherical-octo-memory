@@ -7,6 +7,7 @@ from roller import sensors
 from roller.sensors import Point
 from roller.calculations import vectorProjection, scalarProduct, world2screen
 from roller.spherebot import Spherebot
+from roller.overlay import Overlay
 from roller import colors
 from typing import List
 
@@ -69,16 +70,16 @@ def drawWorld():
     if config['debug']:
         screen.blit(world.surface, (world.x, world.y))
 
-    if CURRENT_TICK - LAST_INTERPRETATION_UPDATE_TIME > 1000:
-        LAST_INTERPRETATION_UPDATE_TIME = CURRENT_TICK
+    if g_current_tick_ms - LAST_INTERPRETATION_UPDATE_TIME > 1000:
+        LAST_INTERPRETATION_UPDATE_TIME = g_current_tick_ms
         # Get the pixel array from the surface
         # and apply brightness reduction to "forget" past sensor data
         pixels = pygame.surfarray.pixels3d(world.interpretation)  # For RGB surfaces
         pixels >>= 1
         del pixels
 
-    if CURRENT_TICK - LAST_MEMORY_UPDATE_TIME > 20000:
-        LAST_MEMORY_UPDATE_TIME = CURRENT_TICK
+    if g_current_tick_ms - LAST_MEMORY_UPDATE_TIME > 20000:
+        LAST_MEMORY_UPDATE_TIME = g_current_tick_ms
         # Get the pixel array from the surface
         # and apply brightness reduction to "forget" past sensor data
         pixels = pygame.surfarray.pixels3d(world.memory)  # For RGB surfaces
@@ -181,8 +182,21 @@ def execute_tick():
         friend.rotate();
     player.move();
     friend.move()
+    
+    for entity in g_entities:
+        for sensor in entity.sensors:
+            sensor.update_temperature(
+                g_ambient_temperature,
+                (g_current_tick_ms - g_previous_tick_ms) / 1000
+            )
+
     drawSpherebot(player);
     drawSpherebot(friend);
+
+    for entity in g_entities:
+        if entity.has_camera:
+            overlay.render_housekeeping(entity.get_housekeeping())
+
 
 
 
@@ -196,12 +210,13 @@ if __name__ == "__main__":
     # Set up the game window
     # screen = pygame.display.set_mode((config['width'], config['height']))
     screen = pygame.display.set_mode((0,0), pygame.FULLSCREEN)
-
     config['width'] = pygame.display.Info().current_w
     config['height'] = pygame.display.Info().current_h
 
     # Set up the game clock
     clock = pygame.time.Clock()
+
+
 
     world_surface = pygame.image.load('roller/assets/map3.png').convert()
 
@@ -215,6 +230,13 @@ if __name__ == "__main__":
 
     world.memory.fill((0,0,0,0))
 
+
+    # Create the overlay object jor displaying robot housekeeping
+    # data
+    overlay = Overlay(screen)
+
+    # Create playble characters and other entities
+
     palette = colors.Cyberpunk
     player = Spherebot(
         x = config['width']/2,  # screen coordinates
@@ -223,10 +245,10 @@ if __name__ == "__main__":
         friction = 1,
         color = palette.dark,
         sensors = [
-            sensors.LIDAR(color = palette.blue),
-            sensors.SingleLaser(color = palette.blue),
-            sensors.GPS_surface_mount(color = palette.pink),
-            sensors.GPS_stabilized(color = palette.yellow),
+            sensors.SpectraScan_SX30(color = palette.blue),
+            sensors.SpectraScan_LX1(color = palette.blue),
+            sensors.NAV1_InertiaCore(color = palette.pink),
+            sensors.NAV1_GyroSphere(color = palette.yellow),
 
         ],
         keybinds = {
@@ -243,18 +265,21 @@ if __name__ == "__main__":
             'left': pygame.K_a, 
             'right': pygame.K_d
         },
-        sensors = [sensors.LIDAR(color=colors.orange)]
+        sensors = [sensors.SpectraScan_SX30(color=colors.orange)]
     )
 
-    CURRENT_TICK = 0
-    PREVIOUS_TICK = 0
+    g_entities = [player, friend]
+    g_ambient_temperature = 25
+
+    g_current_tick_ms = 0
+    g_previous_tick_ms = 0
     # Game loop
     RUNNING = True
     while RUNNING:
         # Event handling
 
-        PREVIOUS_TICK = CURRENT_TICK
-        CURRENT_TICK = pygame.time.get_ticks()
+        g_previous_tick_ms = g_current_tick_ms
+        g_current_tick_ms = pygame.time.get_ticks()
 
         # (draw your game objects here)
         execute_tick()

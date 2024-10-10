@@ -7,7 +7,7 @@ from roller.datatypes import Point
 from roller.colors import is_ground_color
 from roller import colors
 from roller.calculations import vectorProjection, screen2world
-from roller.sensors import LIDAR, Sensor
+from roller.sensors import SpectraScan_SX30, Sensor
 import pygame
 
 @dataclass
@@ -28,6 +28,22 @@ class Spherebot:
     sensors: List[Sensor] = field(default_factory=list)
     keybinds: Dict[str,int] = field(default_factory=dict)
     has_camera: bool = False
+
+    def get_housekeeping(self):
+        housekeeping = dict(
+            x = round(self.x, 1),
+            y = round(self.y, 1),
+            vy = round(self.vy, 1),
+            vx = round(self.vx, 1),
+            omega = round(self.omega, 1),
+            phi = round(self.phi, 1),
+        )
+        housekeeping['sensors'] = []
+        for sensor in self.sensors:
+            housekeeping['sensors'].append(sensor.get_housekeeping())
+
+        return housekeeping
+
 
 
     def move(self):
