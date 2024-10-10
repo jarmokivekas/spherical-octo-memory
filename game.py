@@ -11,7 +11,7 @@ from roller.overlay import Overlay
 from roller import colors
 from typing import List
 from roller.conditions import g_player_conditions
-
+from roller import characters
 
 config = {
     "fps": 60,
@@ -36,33 +36,34 @@ class World:
 """checks the location of the player and moves the view
 of the wold accordingly"""
 def worldEdgeCheck(player):
-    x_pad = 20
-    y_pad = 100
-    center_x = config['width']/2
-    center_y = config['height']/2
-    ##x-axis - follows constantly
-    if(player.x > (center_x + x_pad)):
-        world.x -= player.x - (center_x + x_pad);
-        player.x = (center_x + x_pad);
+    pass
+    # x_pad = 20
+    # y_pad = 100
+    # center_x = config['width']/2
+    # center_y = config['height']/2
+    # ##x-axis - follows constantly
+    # if(player.x > (center_x + x_pad)):
+    #     world.x -= player.x - (center_x + x_pad);
+    #     player.x = (center_x + x_pad);
     
-    elif(player.x < (center_x - x_pad)):
-        world.x -= player.x - (center_x - x_pad);
-        player.x = (center_x - x_pad);
+    # elif(player.x < (center_x - x_pad)):
+    #     world.x -= player.x - (center_x - x_pad);
+    #     player.x = (center_x - x_pad);
     
-    ##--y-axis - moves at treshhold
-    if(player.y > (center_y + y_pad)):
-        world.y -= player.y - (center_y + y_pad);
-        player.y = (center_y + y_pad);
+    # ##--y-axis - moves at treshhold
+    # if(player.y > (center_y + y_pad)):
+    #     world.y -= player.y - (center_y + y_pad);
+    #     player.y = (center_y + y_pad);
     
-    elif(player.y < (center_y-y_pad)):
-        world.y -= player.y - (center_y-y_pad);
-        player.y = (center_y-y_pad);
+    # elif(player.y < (center_y-y_pad)):
+    #     world.y -= player.y - (center_y-y_pad);
+    #     player.y = (center_y-y_pad);
     
 
 LAST_MEMORY_UPDATE_TIME = 0
 LAST_INTERPRETATION_UPDATE_TIME = 0
 
-def drawWorld():
+def drawWorld(world):
     # Drawing
     global LAST_MEMORY_UPDATE_TIME
     global LAST_INTERPRETATION_UPDATE_TIME
@@ -92,8 +93,9 @@ def drawWorld():
     else:
         world.interpretation.fill((0,0,0,0))
 
-    for sensor in player.sensors:
-        sensor.run(player, world)
+    for entity in g_entities:
+        for sensor in entity.sensors:
+            sensor.run(entity, world)
     
     # for sensor in friend.sensors:
     #     sensor.run(friend, world)
@@ -111,10 +113,7 @@ def drawSpherebot(bot: Spherebot):
 
     origin = Point(0,0)
 
-    if bot.has_camera:
-        origin = Point(bot.x,bot.y)
-    else:
-        origin = world2screen(bot, world)
+    origin = world2screen(bot, world)
 
     pygame.draw.circle(screen, bot.color, origin, bot.radius)
 
@@ -138,7 +137,7 @@ def drawSpherebot(bot: Spherebot):
         pygame.draw.circle(screen, (255,128,0), collsion_center_xy, 2)
 
 
-def handle_events(player):
+def handle_events(bot):
     global RUNNING
     for event in pygame.event.get():
 
@@ -149,27 +148,27 @@ def handle_events(player):
 
         if event.type == pygame.KEYDOWN:
         
-            sensor_count = len(player.sensors)
+            sensor_count = len(bot.sensors)
             if event.key == pygame.K_1 and sensor_count > 0:
-                player.sensors[0].toggle()
+                bot.sensors[0].toggle()
             elif event.key == pygame.K_2 and sensor_count > 1:
-                player.sensors[1].toggle()
+                bot.sensors[1].toggle()
             elif event.key == pygame.K_3 and sensor_count > 2:
-                player.sensors[2].toggle()
+                bot.sensors[2].toggle()
             elif event.key == pygame.K_4 and sensor_count > 3:
-                player.sensors[3].toggle()
+                bot.sensors[3].toggle()
             elif event.key == pygame.K_5 and sensor_count > 4:
-                player.sensors[4].toggle()
+                bot.sensors[4].toggle()
             elif event.key == pygame.K_6 and sensor_count > 5:
-                player.sensors[5].toggle()
+                bot.sensors[5].toggle()
             elif event.key == pygame.K_7 and sensor_count > 6:
-                player.sensors[6].toggle()
+                bot.sensors[6].toggle()
             elif event.key == pygame.K_8 and sensor_count > 7:
-                player.sensors[7].toggle()
+                bot.sensors[7].toggle()
             elif event.key == pygame.K_9 and sensor_count > 8:
-                player.sensors[8].toggle()
+                bot.sensors[8].toggle()
             elif event.key == pygame.K_0 and sensor_count > 9:
-                player.sensors[9].toggle()
+                bot.sensors[9].toggle()
     
 
             elif event.key == pygame.K_ESCAPE:  # Exit fullscreen on ESC key press
@@ -177,31 +176,26 @@ def handle_events(player):
 
 
 def execute_tick():
-    handle_events(player)
-    worldEdgeCheck(player)
-    drawWorld()
-    if (player.touch(world)):
-        player.collide(world);
-        player.rotate();
+    handle_events(characters.player1)
+    # worldEdgeCheck(player)
+    drawWorld(world)
 
-    if (friend.touch(world)):
-        friend.collide(world);
-        friend.rotate();
-    player.move();
-    friend.move()
-    
     for entity in g_entities:
+        # TODO: This should be a more generic "physics tick"
+        # for entities. Not all of them need collide and rotate physics
+        if (entity.touch(world)):
+            entity.collide(world);
+            entity.rotate();
+
+        entity.move();
+        
         for sensor in entity.sensors:
             sensor.update_temperature(
                 g_ambient_temperature,
                 (g_current_tick_ms - g_previous_tick_ms) / 1000
             )
-    
-    if ["you are aware you are a robot"] == True:
-        drawSpherebot(player);
-        drawSpherebot(friend);
-    else:
-        drawSpherebot(Spherebot(radius= 5, color= colors.Cyberpunk.white, x=player.x, y = player.y))
+
+        drawSpherebot(entity)
 
     for entity in g_entities:
         if entity.has_camera:
@@ -230,8 +224,8 @@ if __name__ == "__main__":
     world_surface = pygame.image.load('roller/assets/map4.png').convert()
 
     world = World(
-        x=700, 
-        y=400,
+        x=0, 
+        y=0,
         surface = world_surface,
         interpretation = pygame.Surface(world_surface.get_size(), pygame.SRCALPHA),
         memory = pygame.Surface(world_surface.get_size(), pygame.SRCALPHA),
@@ -246,39 +240,9 @@ if __name__ == "__main__":
 
     # Create playble characters and other entities
 
-    palette = colors.Cyberpunk
-    player = Spherebot(
-        x = config['width']/2,  # screen coordinates
-        y = config['height']/2, 
-        radius = 20,
-        friction = 1,
-        color = palette.dark,
-        sensors = [
-            sensors.FOTIRS(),
-            sensors.SpectraScan_SX30(color = palette.blue).disable() ,
-            sensors.SpectraScan_LX1(color = palette.blue).disable() ,
-            sensors.NAV1_InertiaCore(color = palette.pink).disable() ,
-            sensors.NAV1_GyroSphere(color = palette.yellow).disable(),
 
-        ],
-        keybinds = {
-            'left': pygame.K_LEFT, 
-            'right': pygame.K_RIGHT
-        },
-        has_camera = True
-    );
 
-    friend = Spherebot(
-        x = 800,
-        y = 1000,
-        keybinds = {
-            'left': pygame.K_a, 
-            'right': pygame.K_d
-        },
-        sensors = [sensors.SpectraScan_SX30(color=colors.orange)]
-    )
-
-    g_entities = [player, friend]
+    g_entities = [characters.player1, characters.player2]
     g_ambient_temperature = 25
 
     g_current_tick_ms = 0

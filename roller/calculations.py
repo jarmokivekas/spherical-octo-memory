@@ -1,4 +1,5 @@
 from roller.datatypes import Point
+from roller import colors
 import math
 
 def scalarProduct(ax, ay, bx, by):
@@ -44,6 +45,22 @@ def get_line_endpoint(start: Point, distance:float, angle:float):
     x2 = start.x + distance * math.cos(angle)
     y2 = start.y + distance * math.sin(angle)
     return Point(x2, y2)
+
+
+
+def get_first_solid_pixel(origin, max_range, theta, world):
+    """function used for sensors. Calculates coordinates for all pixels along 
+    the line going from origin, in direction theta all the way to the max_range.
+    Then scans trhough and returns the coordinates of the first soil/ground pixel along the line"""
+    # the pixel coordinates at max_range from origin in direction theta
+    end_point = get_line_endpoint(origin, max_range, theta)
+    # coordinates for all pixels along the ray
+    ray_points = get_line_pixels(origin, end_point)
+    for point in ray_points:
+        pixel_color = world.surface.get_at(point)
+        if colors.is_ground_color(pixel_color):
+            return point
+    return None
 
 
 def clip(value, min, max):

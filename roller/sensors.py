@@ -2,22 +2,11 @@ from roller import colors
 import pygame
 import numpy as np
 import math
-from roller.calculations import get_line_pixels, get_line_endpoint, screen2world
+from roller.calculations import get_line_pixels, get_first_solid_pixel, get_line_endpoint, screen2world
 from roller.datatypes import Point
 
 import random
 
-
-def get_first_solid_pixel(origin, max_range, theta, world):
-    # the pixel coordinates at max_range from origin in direction theta
-    end_point = get_line_endpoint(origin, max_range, theta)
-    # coordinates for all pixels along the ray
-    ray_points = get_line_pixels(origin, end_point)
-    for point in ray_points:
-        pixel_color = world.surface.get_at(point)
-        if colors.is_ground_color(pixel_color):
-            return point
-    return None
 
 
 class Sensor:
