@@ -48,3 +48,6 @@ def get_line_endpoint(start: Point, distance:float, angle:float):
 
 def screen2world(screen_point:Point, world):
     return Point(screen_point.x - world.x, screen_point.y - world.y)
+
+def world2screen(world_point: Point, world):
+    return Point(world_point.x + world.x, world_point.y + world.y)
