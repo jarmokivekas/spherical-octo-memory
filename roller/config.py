@@ -9,5 +9,8 @@ class GameConfig:
     camera_ki: float = 0.1   # Camera movement PID integral gain
     camera_kd: float = 0.2   # Camera movement PID derivative gain
 
+    fullscreen: bool = True
+    height: int = 600        # window size if not in full screen mode
+    width: int = 800
 
 g_config = GameConfig()
