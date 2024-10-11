@@ -14,6 +14,7 @@ from roller.datatypes import Point
 from roller import colors
 from roller import sensors
 from roller import characters
+from roller import camera
 
 config = {
     # "fps": 1,
@@ -36,35 +37,6 @@ class World:
 
 
 
-"""checks the location of the player and moves the view
-of the wold accordingly"""
-def panCameraToWorldCoords(camera_target: Point, world, screen):
-
-    world.x = - camera_target.x + screen.get_width()/2
-    world.y = - camera_target.y + screen.get_height()/2
-    # x_pad = 20
-    # y_pad = 100
-    # center_x = config['width']/2
-    # center_y = config['height']/2
-    # ##x-axis - follows constantly
-    # if(player.x > (center_x + x_pad)):
-    #     world.x -= player.x - (center_x + x_pad);
-    #     player.x = (center_x + x_pad);
-    
-    # elif(player.x < (center_x - x_pad)):
-    #     world.x -= player.x - (center_x - x_pad);
-    #     player.x = (center_x - x_pad);
-    
-    # ##--y-axis - moves at treshhold
-    # if(player.y > (center_y + y_pad)):
-    #     world.y -= player.y - (center_y + y_pad);
-    #     player.y = (center_y + y_pad);
-    
-    # elif(player.y < (center_y-y_pad)):
-    #     world.y -= player.y - (center_y-y_pad);
-    #     player.y = (center_y-y_pad);
-    
-
 LAST_MEMORY_UPDATE_TIME = 0
 LAST_INTERPRETATION_UPDATE_TIME = 0
 
@@ -80,13 +52,13 @@ def drawWorld(world):
 
     if g_player_conditions["you have a memory bank for sensor data"]:
             
-        if g_current_tick_ms - LAST_INTERPRETATION_UPDATE_TIME > 1000:
-            LAST_INTERPRETATION_UPDATE_TIME = g_current_tick_ms
-            # Get the pixel array from the surface
-            # and apply brightness reduction to "forget" past sensor data
-            pixels = pygame.surfarray.pixels3d(world.interpretation)  # For RGB surfaces
-            pixels >>= 1
-            del pixels
+        # if g_current_tick_ms - LAST_INTERPRETATION_UPDATE_TIME > 1000:
+        #     LAST_INTERPRETATION_UPDATE_TIME = g_current_tick_ms
+        #     # Get the pixel array from the surface
+        #     # and apply brightness reduction to "forget" past sensor data
+        #     pixels = pygame.surfarray.pixels3d(world.interpretation)  # For RGB surfaces
+        #     pixels >>= 1
+        #     del pixels
 
         if g_current_tick_ms - LAST_MEMORY_UPDATE_TIME > 20000:
             LAST_MEMORY_UPDATE_TIME = g_current_tick_ms
@@ -125,7 +97,6 @@ def drawSpherebot(bot: Bot):
     pygame.draw.circle(screen, bot.color, origin, bot.radius)
 
     for sensor in bot.sensors:
-        print("renderng", sensor)
         sensor.render(bot, world, screen)
 
     if config['debug']:
@@ -184,7 +155,9 @@ def execute_tick(world, screen):
     # one entity and the next
     for entity in g_entities:
         if entity.has_camera:
-            panCameraToWorldCoords(entity, world, screen)
+            g_camera.set_target(entity)
+            g_camera.update_pid((g_current_tick_ms - g_previous_tick_ms)/1000)
+            g_camera.move(world, screen)
 
     handle_events(characters.player1)
     drawWorld(world)
@@ -232,7 +205,7 @@ if __name__ == "__main__":
     clock = pygame.time.Clock()
 
 
-    world_surface = pygame.image.load('roller/assets/map4.png').convert()
+    world_surface = pygame.image.load('roller/assets/map5.png').convert()
 
     world = World(
         x=0, 
@@ -244,18 +217,21 @@ if __name__ == "__main__":
 
     world.memory.fill((0,0,0,0))
 
-
     # Create the overlay object jor displaying robot housekeeping
-    # data
     overlay = Overlay(screen)
 
-    # Create playble characters and other entities
+    # contols which part of the world is rendered on screen
+    g_camera = camera.Camera()
 
+    # Create playble characters and other entities
     g_entities = [
         characters.player1,
         # characters.player2,
         characters.aros,
     ]
+
+    # this will eventually be information part of the world map
+    # TODO: use global GameConfig() instead
     g_ambient_temperature = 25
 
     g_current_tick_ms = 0
