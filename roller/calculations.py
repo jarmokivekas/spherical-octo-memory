@@ -2,7 +2,7 @@ import math
 import random
 from roller.datatypes import Point
 from roller import colors
-
+from roller import material
 def scalarProduct(ax, ay, bx, by):
     return ax*bx + ay*by;
 
@@ -49,7 +49,8 @@ def get_line_endpoint(start: Point, distance:float, angle:float):
 
 
 
-def get_first_solid_pixel(origin, max_range, theta, world):
+
+def get_lidar_return(origin, max_range, theta, world):
     """function used for sensors. Calculates coordinates for all pixels along 
     the line going from origin, in direction theta all the way to the max_range.
     Then scans trhough and returns the coordinates of the first soil/ground pixel along the line"""
@@ -59,12 +60,10 @@ def get_first_solid_pixel(origin, max_range, theta, world):
     ray_points = get_line_pixels(origin, end_point)
     for point in ray_points:
         pixel_color = world.surface.get_at(point)
-        if colors.is_ground_color(pixel_color):
+
+        if material.is_light_scattering(pixel_color):
             return point
-        if colors.is_water_color(pixel_color):
-            if random.random() <= 0.10:
-                return point
-            continue
+
     return None
 
 
