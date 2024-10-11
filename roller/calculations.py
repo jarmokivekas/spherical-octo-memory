@@ -1,6 +1,7 @@
+import math
+import random
 from roller.datatypes import Point
 from roller import colors
-import math
 
 def scalarProduct(ax, ay, bx, by):
     return ax*bx + ay*by;
@@ -60,6 +61,10 @@ def get_first_solid_pixel(origin, max_range, theta, world):
         pixel_color = world.surface.get_at(point)
         if colors.is_ground_color(pixel_color):
             return point
+        if colors.is_water_color(pixel_color):
+            if random.random() <= 0.10:
+                return point
+            continue
     return None
 
 

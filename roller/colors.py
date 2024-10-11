@@ -45,8 +45,16 @@ class Monokai:
 def is_ground_color(color):
     if ((color[0] == 0) and
         (color[1] == 0) and
-        (color[2] == 0)
-    ):
+        (color[2] == 0)):
+        return True
+    else:
+        return False
+
+def is_water_color(color):
+    if (
+        color[0] == 0 and
+        color[1] == 0 and
+        color[2] >  0 ):
         return True
     else:
         return False

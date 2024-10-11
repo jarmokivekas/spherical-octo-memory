@@ -8,7 +8,7 @@ from roller import colors
 from roller.calculations import vectorProjection, screen2world, clip
 from roller.sensors import SpectraScan_SX30, Sensor
 from roller.conditions import g_player_conditions
-from roller.config import config
+from roller.config import g_config
 import pygame
 
 @dataclass
@@ -87,7 +87,7 @@ class Spherebot(Bot):
         self.omega *= 0.95;
 
         # Gravity
-        self.vy += config.gravity_acceleration 
+        self.vy += g_config.gravity_acceleration 
 
         # Rotate and move
         self.phi += self.omega;

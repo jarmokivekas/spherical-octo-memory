@@ -7,8 +7,8 @@ from roller import colors
 palette = colors.Cyberpunk
 
 player1 = Spherebot(
-    x = 250,  # world coordinates
-    y = 100, 
+    x = 800,  # world coordinates
+    y = 200, 
     radius = 20,
     color = palette.dark,
     sensors = [

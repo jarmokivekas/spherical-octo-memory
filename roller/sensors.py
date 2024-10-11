@@ -134,27 +134,15 @@ class SpectraScan_SX30(Sensor):
         self.laser_count = laser_count
         self.model: str = self.__class__.__name__
 
- 
-
     def run(self, bot, world):
 
         for theta in np.linspace(0, 2*math.pi, num=self.laser_count):
-            # We calculat the world coordinate to which the lidat ray will travel
-            end_point = get_line_endpoint(bot, self.range, theta)
-            # origin and endpoint are now in world coordinates
-            # pygame.draw.line(world.interpretation, colors.blue, origin, end_point, 1)
 
-            # we get a list of coordinate points from the bot's position
-            # we are operating in world coordinates
-            ray_points = get_line_pixels(bot, end_point)
-
-            for point in ray_points:
-                pixel_color = world.surface.get_at(point)
-                if colors.is_ground_color(pixel_color):
-                    pygame.draw.circle(world.interpretation, self.color, point, 1)  # Clear circle with full transparency
-                    if self.shows_ray:
-                        pygame.draw.line(world.interpretation, self.color + (30,), bot.xy, point, 1)
-                    break
+            point = get_first_solid_pixel(bot, self.range, theta, world)
+            if point != None:
+                pygame.draw.circle(world.interpretation, self.color, point, 1) 
+                if self.shows_ray:
+                    pygame.draw.line(world.interpretation, self.color + (30,), bot.xy, point, 1)
 
 
 
