@@ -4,33 +4,44 @@ from typing import List, Dict
 from dataclasses import dataclass, field
 
 from roller.datatypes import Point
-from roller.colors import is_ground_color
 from roller import colors
 from roller.calculations import vectorProjection, screen2world, clip
 from roller.sensors import SpectraScan_SX30, Sensor
 from roller.conditions import g_player_conditions
+from roller.config import config
 import pygame
 
 @dataclass
-class Spherebot:
-    """Introducing the SphereBot-1000 - Your go-to spherical robotics platform that gets the job done, no frills attached. Whether you're mapping caves, patrolling perimeters, or just rolling around, the SphereBot-1000 delivers reliable performance for all your basic robotics needs. Built to last, easy to maintain, and ready to tackle whatever task you throw at it (within reason, of course)."""
-    
-    x: float # world coordinates
-    y: float # world coordinates
+class Bot():
+    x: float
+    y: float
+    has_camera: bool = False
+    color: tuple = (60,60,60)
     vy: float = 0
     vx: float = 0
+    omega: float = 0 # speed of rotation (radian/time (frame or second?))
+    phi: float = 0   # the angle of rotation
+    sensors: List[Sensor] = field(default_factory=list)
+    keybinds: Dict[str,int] = field(default_factory=dict)
+
+    def get_xy(self):
+        return (self.x, self.y)
+
+class Spherebot(Bot):
+    """Introducing the SphereBot-1000 - Your go-to spherical robotics platform that gets the job done, no frills attached. Whether you're mapping caves, patrolling perimeters, or just rolling around, the SphereBot-1000 delivers reliable performance for all your basic robotics needs. Built to last, easy to maintain, and ready to tackle whatever task you throw at it (within reason, of course)."""
+    
     radius: float = 20
-    omega: float = 0
-    phi: float = 0   # the angle of rotation in radians
     collisionDirectionX: float = 1  # collision direction provides direction of the collision force vector
     collisionDirectionY: float = 0
     closest_pixel_distance: float = 20
-    color: tuple = (60,60,60)
     accent_color: tuple = colors.blue
     friction: float = 1
-    sensors: List[Sensor] = field(default_factory=list)
-    keybinds: Dict[str,int] = field(default_factory=dict)
-    has_camera: bool = False
+
+    def __init__(self, radius=20, *args, **kwargs):
+        # this passess all other arguments given to this initializer to the 
+        # parent calss to take care of
+        super().__init__(*args, **kwargs)
+        self.radius = radius
 
     def get_housekeeping(self):
         housekeeping = dict(
@@ -47,7 +58,10 @@ class Spherebot:
 
         return housekeeping
 
-
+    @property
+    def xy(self):
+        """just to easily access the xy position for pygame functions"""
+        return (self.x, self.y)
 
     def move(self):
         """Move the bot in the world according to it current velocities
@@ -73,7 +87,7 @@ class Spherebot:
         self.omega *= 0.95;
 
         # Gravity
-        self.vy += 0.2 # TODO read this from config
+        self.vy += config.gravity_acceleration 
 
         # Rotate and move
         self.phi += self.omega;
@@ -89,11 +103,8 @@ class Spherebot:
         """
 
         # Loop through the pixels around the self
-        origin = Point(0,0)
-        if self.has_camera: 
-            origin = screen2world(self, world)
-        else:
-            origin = Point(self.x, self.y)
+
+        origin = Point(self.x, self.y)
         
         radius = math.floor(self.radius)
         x = math.floor(origin.x)
@@ -112,7 +123,7 @@ class Spherebot:
 
                 # check pixel values from the world surface itself
                 color = world.surface.get_at((pixel_x, pixel_y))
-                if is_ground_color(color) and pixelDistance <= self.radius:
+                if colors.is_ground_color(color) and pixelDistance <= self.radius:
                     pixelsHit += 1
                     pixelSumX += dx
                     pixelSumY += dy
@@ -156,11 +167,17 @@ class Spherebot:
 
     def rotate(self):
         
+
         # Get the state of all keys
         keys = pygame.key.get_pressed()
 
         friction = self.friction;
-        if(keys[self.keybinds['left']] or keys[self.keybinds['right']]):
+
+        # this needs to be complicated like this, so it doesn't brake for 
+        # entities that don't have keybinds
+        if (('left'  in self.keybinds and keys[self.keybinds['left']]) or
+            ('right' in self.keybinds and keys[self.keybinds['right']])):
+
             speedMean = 0;
             scalar = self.vx*self.collisionDirectionY - self.vy*self.collisionDirectionX;
             scalar2 = self.vx*self.collisionDirectionX + self.vy*self.collisionDirectionY;

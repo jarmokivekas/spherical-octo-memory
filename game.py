@@ -1,21 +1,24 @@
 import pygame
-from pygame.locals import *
-from dataclasses import dataclass
 import math
 import numpy as np
-from roller import sensors
-from roller.sensors import Point
-from roller.calculations import vectorProjection, scalarProduct, world2screen
-from roller.spherebot import Spherebot
-from roller.overlay import Overlay
-from roller import colors
+
+from pygame.locals import *
+from dataclasses import dataclass
 from typing import List
+
+from roller.calculations import vectorProjection, scalarProduct, world2screen
+from roller.spherebot import Spherebot, Bot
+from roller.overlay import Overlay
 from roller.conditions import g_player_conditions
+from roller.datatypes import Point
+from roller import colors
+from roller import sensors
 from roller import characters
 
 config = {
+    # "fps": 1,
     "fps": 60,
-    "gravity_acceleration": 0.2, # acceleration in pixels / second^2
+    "gravity_acceleration": 1, # acceleration in pixels / second^2
     "height": 0,
     "width": 0,
     "debug": False,
@@ -35,8 +38,10 @@ class World:
 
 """checks the location of the player and moves the view
 of the wold accordingly"""
-def worldEdgeCheck(player):
-    pass
+def panCameraToWorldCoords(camera_target: Point, world, screen):
+
+    world.x = - camera_target.x + screen.get_width()/2
+    world.y = - camera_target.y + screen.get_height()/2
     # x_pad = 20
     # y_pad = 100
     # center_x = config['width']/2
@@ -95,6 +100,8 @@ def drawWorld(world):
 
     for entity in g_entities:
         for sensor in entity.sensors:
+            if sensor.is_enabled == False:
+                continue
             sensor.run(entity, world)
     
     # for sensor in friend.sensors:
@@ -105,25 +112,21 @@ def drawWorld(world):
 
 
 
-def drawSpherebot(bot: Spherebot):
+def drawSpherebot(bot: Bot):
     # main body of the bot
     if bot.has_camera and not g_player_conditions['you are aware you are a robot']:
         # we don't render the bot until it has become aware that it is a bot
         return
 
-    origin = Point(0,0)
-
+ 
+    #TODO: if this is outside the screen (by some buffer, just return and don't render)
     origin = world2screen(bot, world)
-
+    
     pygame.draw.circle(screen, bot.color, origin, bot.radius)
 
-    # Accent dot to make the rotation of the bot visible
-    # we divide by 4 so the dot is 
-    accent_xy = (
-        origin.x + math.cos(bot.phi)*bot.radius*0.7,
-        origin.y + math.sin(bot.phi)*bot.radius*0.7
-    )
-    pygame.draw.circle(screen, bot.accent_color, accent_xy, bot.radius/5)
+    for sensor in bot.sensors:
+        print("renderng", sensor)
+        sensor.render(bot, world, screen)
 
     if config['debug']:
         # draw the center of the bot position
@@ -175,14 +178,22 @@ def handle_events(bot):
                 RUNNING = False
 
 
-def execute_tick():
+def execute_tick(world, screen):
+
+    # We move the world on it's own, so the world is not moving between processing
+    # one entity and the next
+    for entity in g_entities:
+        if entity.has_camera:
+            panCameraToWorldCoords(entity, world, screen)
+
     handle_events(characters.player1)
-    # worldEdgeCheck(player)
     drawWorld(world)
 
     for entity in g_entities:
         # TODO: This should be a more generic "physics tick"
         # for entities. Not all of them need collide and rotate physics
+
+
         if (entity.touch(world)):
             entity.collide(world);
             entity.rotate();
@@ -240,9 +251,11 @@ if __name__ == "__main__":
 
     # Create playble characters and other entities
 
-
-
-    g_entities = [characters.player1, characters.player2]
+    g_entities = [
+        characters.player1,
+        # characters.player2,
+        characters.aros,
+    ]
     g_ambient_temperature = 25
 
     g_current_tick_ms = 0
@@ -254,9 +267,10 @@ if __name__ == "__main__":
 
         g_previous_tick_ms = g_current_tick_ms
         g_current_tick_ms = pygame.time.get_ticks()
-
+        world.y +=1
+        # characters.player1.x += 1
         # (draw your game objects here)
-        execute_tick()
+        execute_tick(world, screen)
 
         pygame.display.flip()  # Update the display
 

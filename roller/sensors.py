@@ -1,27 +1,45 @@
-from roller import colors
-import pygame
 import numpy as np
-import math
-from roller.calculations import get_line_pixels, get_first_solid_pixel, get_line_endpoint, screen2world
-from roller.datatypes import Point
-
 import random
+import pygame
+import math
+from dataclasses import dataclass
+from roller.datatypes import Point
+from roller import colors
+from roller.calculations import (
+    get_line_pixels, 
+    get_first_solid_pixel,
+    get_line_endpoint,
+    screen2world,
+    world2screen
+)
 
 
 
+@dataclass
 class Sensor:
 
     # Power and temperature attributes
-    temperature = 20     # Current temperature of the sensor
-    power_draw = 1       # Watts
-    mass = 0.2           # m, Assumed mass in kg
-    heat_capacity = 900  # Assumed specific heat capacity in J/(kg*K)
-    heat_dissipation_rate = 0.1  # Example dissipation rate
+    temperature: float   = 20     # Current temperature of the sensor
+    power_draw: float    = 1       # Watts
+    mass: float          = 0.2           # m, Assumed mass in kg
+    heat_capacity: float = 500  # Assumed specific heat capacity in J/(kg*K)
+    heat_dissipation_rate:float = 0.1  # Example dissipation rate
+    color: tuple = colors.cyan
+    is_enabled:bool = True             # Whether the sensor is active
+    mount_angle: float = 0
+    #####################################
+    ## Methods childred should implement
+    #####################################3
+    def run(self):
+        """This method will be implemented in specific sensor subclasses."""
+        raise NotImplementedError("run must be implemented in subclasses.")
 
-    def __init__(self, color = colors.cyan):
-        self.is_enabled = True             # Whether the sensor is active
-        self.color = color
-        self.model = self.__class__.__name__
+    def render(self, bot, world, screen):
+        pass
+
+    ######################
+    # Common methods for all sensors
+    #######################
 
     def get_housekeeping(self):
         return dict(
@@ -48,16 +66,14 @@ class Sensor:
         return self
 
     def get_status(self):
-        """Return sensor's status."""
+        """Return sensor's status. This is intended for
+        user interface programming. """
         return {
             "power_draw": self.power_draw,
             "is_enabled": self.is_enabled,
             "temperature": self.temperature
         }
 
-    def run(self):
-        """This method will be implemented in specific sensor subclasses."""
-        raise NotImplementedError("run must be implemented in subclasses.")
 
     def update_temperature(self, ambient_temperature, dt):
         # Calculate heat generated
@@ -76,24 +92,24 @@ class Sensor:
 
 # Specific sensor classes inheriting from the base Sensor class
 class SpectraScan_LX1(Sensor):
-    
-    marketing_copy = """Meet the SpectraScan-LX1, the ultimate single-ray laser range finder, born from a sphere-whacking club-wielding human sport eqpuipment that’s been reverse-engineered, reimagined, and perfected for your everyday robotics sensing needs. 
+    """Meet the SpectraScan-LX1, the ultimate single-ray laser range finder, born from a sphere-whacking club-wielding human sport eqpuipment that’s been reverse-engineered, reimagined, and perfected for your everyday robotics sensing needs. 
     """
     power_draw = 2
-    def __init__(self, range = 1000, color = colors.cyan, mount_angle = 0):
+    shows_ray = True
+
+    def __init__(self, range = 1000, *args, **kwargs):
             # Call the base class constructor
-            super().__init__(color = color)
+            super().__init__(*args, **kwargs)
             # SpectraScan_SX30-specific attribute
             self.range = range
-            self.shows_ray = True
-            self.mount_angle = mount_angle
+            self.model: str = self.__class__.__name__
 
-    def run(self, player, world):
-        if self.is_enabled:
 
-            origin = screen2world(player, world)
-            end_point = get_line_endpoint(origin, self.range, self.mount_angle + player.phi)
-            ray_points = get_line_pixels(origin, end_point)
+
+    def run(self, bot, world):
+            
+            end_point = get_line_endpoint(bot, self.range, self.mount_angle + bot.phi)
+            ray_points = get_line_pixels(bot, end_point)
 
             for point in ray_points:
                 pixel_color = world.surface.get_at(point)
@@ -101,13 +117,12 @@ class SpectraScan_LX1(Sensor):
                     pygame.draw.circle(world.interpretation, self.color, point, 1)  # Clear circle with full transparency
                     if self.shows_ray:
                         # the range on the single laser if higer than SpectraScan_SX30, so the ray is more opaque
-                        pygame.draw.line(world.interpretation, self.color + (60,), origin, point, 2)
+                        pygame.draw.line(world.interpretation, self.color + (60,), (bot.x,bot.y), point, 2)
                     break
 
 
 class SpectraScan_SX30(Sensor):
-
-    marketing_copy = """Meet the SpectraScan-SX30 - your answer to getting lost and running into things! We took thirty of our trusty LX1 rangefinders, packed them into one powerful sensor array, and called it a day. Well... almost. Turns out, cramming that much tech makes it run a little toasty, we had to dial back the range a bit. But hey, it’s still a game-changer for up-close precision."""
+    """Meet the SpectraScan-SX30 - your answer to getting lost and running into things! We took thirty of our trusty LX1 rangefinders, packed them into one powerful sensor array, and called it a day. Well... almost. Turns out, cramming that much tech makes it run a little toasty, we had to dial back the range a bit. But hey, it’s still a game-changer for up-close precision."""
 
     def __init__(self, range = 300, laser_count = 30,color = colors.green,):
         # Call the base class constructor
@@ -117,65 +132,108 @@ class SpectraScan_SX30(Sensor):
         self.range = range
         self.shows_ray = True
         self.laser_count = laser_count
+        self.model: str = self.__class__.__name__
 
-    def run(self, player, world):
-        if self.is_enabled:
-            origin = screen2world(player, world)
-   
-            for theta in np.linspace(0, 2*math.pi, num=self.laser_count):
-                # We calculat the world coordinate to which the lidat ray will travel
-                end_point = get_line_endpoint(origin, self.range, theta)
-                # origin and endpoint are now in world coordinates
-                # pygame.draw.line(world.interpretation, colors.blue, origin, end_point, 1)
+ 
 
-                # we get a list of coordinate points from the player's position
-                # we are operating in world coordinates
-                ray_points = get_line_pixels(origin, end_point)
+    def run(self, bot, world):
 
-                for point in ray_points:
-                    pixel_color = world.surface.get_at(point)
-                    if colors.is_ground_color(pixel_color):
-                        pygame.draw.circle(world.interpretation, self.color, point, 1)  # Clear circle with full transparency
-                        if self.shows_ray:
-                            pygame.draw.line(world.interpretation, self.color + (30,), origin, point, 1)
-                        break
+        for theta in np.linspace(0, 2*math.pi, num=self.laser_count):
+            # We calculat the world coordinate to which the lidat ray will travel
+            end_point = get_line_endpoint(bot, self.range, theta)
+            # origin and endpoint are now in world coordinates
+            # pygame.draw.line(world.interpretation, colors.blue, origin, end_point, 1)
+
+            # we get a list of coordinate points from the bot's position
+            # we are operating in world coordinates
+            ray_points = get_line_pixels(bot, end_point)
+
+            for point in ray_points:
+                pixel_color = world.surface.get_at(point)
+                if colors.is_ground_color(pixel_color):
+                    pygame.draw.circle(world.interpretation, self.color, point, 1)  # Clear circle with full transparency
+                    if self.shows_ray:
+                        pygame.draw.line(world.interpretation, self.color + (30,), bot.xy, point, 1)
+                    break
 
 
 
 class FOTIRS(Sensor):
     """Introducing the Forward-Emitting Optical Terrain Illumination and Reflectivity Sensor (FOTIRS)—a precision-engineered light-based sensor designed to project a controlled beam forward and downward, scanning the terrain ahead for optimal navigation and environmental awareness."""
-    def __init__(self):
-        super().__init__()
+
+
+
+
+    def __init__(self, laser_count=100, **kwargs):
+        super().__init__(**kwargs)
         self.color = colors.Cyberpunk.white
+        self.laser_count = laser_count
+        self.power_draw = laser_count
+        self.model = self.__class__.__name__
+
+
+    def render(self, bot, world, screen):
+        if is_enabled:
+            pygame.draw.circle(world.interpretation, self.color, point, 3)
+        
 
     def run(self, bot, world):
-        if self.is_enabled == False:
-            return;
 
-        origin = screen2world(bot, world)
-
-        for theta in np.linspace(0, math.pi, num=100):
-            point = get_first_solid_pixel(origin, 200, theta, world)
+        for theta in np.linspace(0, math.pi, num=self.laser_count):
+            point = get_first_solid_pixel(bot, 200, theta, world)
             if point != None:
                 pygame.draw.circle(world.interpretation, self.color, point, 1)
 
 
 
 class NAV1_InertiaCore(Sensor):
-    def run(self, player, world):
-        if self.is_enabled:
-            origin = screen2world(player, world)
-            sensor_location = get_line_endpoint(origin, player.radius, player.phi)
-            pygame.draw.circle(world.memory, self.color, sensor_location, 1) 
+    """ NAV1_InertiaCore – Your Essential Navigation Companion. Need reliable motion tracking without the frills? The NAV1_InertiaCore is built for the everyday robotic explorer. Affordable, simple, and easy to integrate, this unit gives you what you need to get rolling."""
+
+    power_draw = 1
+    def __init__(self, laser_count=100, **kwargs):
+        super().__init__(**kwargs)
+        self.model = self.__class__.__name__
+
+    def run(self, bot, world):
+
+        sensor_location = get_line_endpoint(bot, bot.radius, bot.phi)
+        pygame.draw.circle(world.memory, self.color, sensor_location, 1) 
+
+    def render(self, bot, world, screen):
+        if not self.is_enabled:
+            return
+        
+        x = bot.x + math.cos(bot.phi)*bot.radius*0.7
+        y = bot.y + math.sin(bot.phi)*bot.radius*0.7
+
+        sensor_xy = world2screen(Point(x,y), world)
+        pygame.draw.circle(screen, self.color, sensor_xy, bot.radius/5)
+
+        
 
 class NAV1_GyroSphere(Sensor):
-    def run(self, player, world):
-        if self.is_enabled:
-            origin = screen2world(player, world)
-            pygame.draw.circle(world.memory, self.color, origin, 1) 
+    """NAV1_GyroCore – Precision, Perfected. For those who demand pinpoint accuracy, the NAV1_GyroCore is the flagship of the NAV1 line. Designed with advanced calibration to track your robot's center of mass with unmatched precision, this high-end unit ensures smooth, stable motion data for even the most demanding applications. Whether you're navigating complex terrains or fine-tuning every movement. """
+
+    power_draw = 5
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.model = self.__class__.__name__
+
+    def run(self, bot, world):
+            pygame.draw.circle(world.memory, self.color, bot.xy, 1) 
+
+    def render(self, bot, world, screen):
+        if not self.is_enabled:
+            return
+        
+        sensor_xy = world2screen(bot, world)
+        pygame.draw.circle(screen, self.color, sensor_xy, bot.radius/5)
+
+        
 
 class Sonar(Sensor):
-    def run(self, player, world):
+    def run(self, bot, world):
         if self.is_enabled:
             print("Sonar is emitting sound waves to detect objects.")
         else:

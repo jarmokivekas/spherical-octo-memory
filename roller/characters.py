@@ -10,14 +10,13 @@ player1 = Spherebot(
     x = 250,  # world coordinates
     y = 100, 
     radius = 20,
-    friction = 1,
     color = palette.dark,
     sensors = [
-        sensors.FOTIRS(),
-        sensors.SpectraScan_SX30(color = palette.blue).disable() ,
         sensors.SpectraScan_LX1(color = palette.blue).disable() ,
-        sensors.NAV1_InertiaCore(color = palette.pink).disable() ,
-        sensors.NAV1_GyroSphere(color = palette.yellow).disable(),
+        sensors.SpectraScan_SX30(color = palette.blue) ,
+        # sensors.FOTIRS(),
+        # sensors.NAV1_InertiaCore(color = palette.pink).disable() ,
+        sensors.NAV1_GyroSphere(color = palette.yellow),
 
     ],
     keybinds = {
@@ -40,4 +39,20 @@ player2 = Spherebot(
         sensors.SpectraScan_LX1(mount_angle=math.pi * 1/3),
         sensors.SpectraScan_LX1(mount_angle=math.pi * 2/3),
     ]
+)
+
+aros  = Spherebot(
+    x = 700,
+    y = 700,
+    radius = 30,
+    color = (10,10,10),
+    sensors = [
+        sensors.SpectraScan_SX30(color=colors.orange),
+        sensors.NAV1_InertiaCore(color=colors.orange),
+    ],
+    keybinds = {
+        'left': pygame.K_q, 
+        'right': pygame.K_e
+    },
+    
 )
