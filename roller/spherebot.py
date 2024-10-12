@@ -9,6 +9,7 @@ from roller.calculations import vectorProjection, screen2world, clip
 from roller.sensors import SpectraScan_SX30, Sensor
 from roller.conditions import g_player_conditions
 from roller.config import g_config
+from roller.behaviours import Behaviour
 import pygame
 
 @dataclass
@@ -23,9 +24,31 @@ class Bot():
     phi: float = 0   # the angle of rotation
     sensors: List[Sensor] = field(default_factory=list)
     keybinds: Dict[str,int] = field(default_factory=dict)
+    joystick: pygame.joystick.Joystick = None
+    behaviours: List[Behaviour] = field(default_factory=list)
 
     def get_xy(self):
         return (self.x, self.y)
+
+    def add_behaviour(self, behaviour):
+        self.behaviours.append(behaviour)
+
+    def add_sensor(self, sensor: Sensor):
+        # TODO: add logic to set the mount_angle for sensors so that they
+        # are placed in a satisfying way. Maybe implemented in the subclasses
+        self.sensors.append(sensor)
+
+    def run_physics(self, world):
+        raise NotImplementedError()
+
+    def run_behaviours(self):
+        for behaviour in self.behaviours:
+            behaviour.run()
+
+    def run_sensors(self, world, screen):
+        raise NotImplementedError()
+
+
 
 class Spherebot(Bot):
     """Introducing the SphereBot-1000 - Your go-to spherical robotics platform that gets the job done, no frills attached. Whether you're mapping caves, patrolling perimeters, or just rolling around, the SphereBot-1000 delivers reliable performance for all your basic robotics needs. Built to last, easy to maintain, and ready to tackle whatever task you throw at it (within reason, of course)."""
@@ -36,6 +59,7 @@ class Spherebot(Bot):
     closest_pixel_distance: float = 20
     accent_color: tuple = colors.blue
     friction: float = 1
+    accelerating:bool  = False    # wether the bot is currently accelerating or coasting
 
     def __init__(self, radius=20, *args, **kwargs):
         # this passess all other arguments given to this initializer to the 
@@ -51,6 +75,9 @@ class Spherebot(Bot):
             vx = round(self.vx, 1),
             omega = round(self.omega, 1),
             phi = round(self.phi, 1),
+            input = {
+                "joystick0": self.joystick.get_axis(0),
+            },
         )
         housekeeping['sensors'] = []
         for sensor in self.sensors:
@@ -63,24 +90,44 @@ class Spherebot(Bot):
         """just to easily access the xy position for pygame functions"""
         return (self.x, self.y)
 
+
+    def accelerate_left(self, gain):
+        self.accelerating = True
+        self.omega += gain * (-1 - self.omega) * 0.1
+        return
+    def accelerate_right(self, gain):
+        self.accelerating = True
+        self.omega += gain * ( 1 - self.omega) * 0.1
+        return
+
+
     def move(self):
         """Move the bot in the world according to it current velocities
         Also apply friction to slow down velocities, and apply
         rotational velocity if the bot has keybinds attached to it"""
 
-        if len(self.keybinds) == 2:
-            # Get the state of all keys
-            keys = pygame.key.get_pressed()
+        previous_omega = self.omega
 
+        if self.joystick is not None:
+            # axis_value is between 1.0...-1.0
+            axis_value = self.joystick.get_axis(0)
+            # Dead zone check
+            if abs(axis_value) > 0.1:  # Only proceed if outside dead zone
+                if axis_value < 0:  # Move left
+                    self.accelerate_left(gain=2.0*abs(axis_value))
+                elif axis_value > 0:  # Move right
+                    self.accelerate_right(gain=2.0*abs(axis_value))
+    
+        # Keyboard input for movement
+        keys = pygame.key.get_pressed()
+        if self.keybinds:
             if keys[self.keybinds['left']]:
-                self.omega += (-1 - self.omega) * 0.1
-            if keys[self.keybinds['right']]:
-                self.omega += (1-self.omega) * 0.1
+                self.accelerate_left(gain=1.0)
 
-        if g_player_conditions["your body is damaged and can only move slowly"]:
-            self.omega = clip(self.omega, min=-0.1, max = 0.1)
+            elif keys[self.keybinds['right']]:
+                self.accelerate_right(gain=1.0)
 
-
+ 
         # friction
         self.vy *= 0.99;
         self.vx *= 0.99;
@@ -175,13 +222,14 @@ class Spherebot(Bot):
 
         # this needs to be complicated like this, so it doesn't brake for 
         # entities that don't have keybinds
-        if (('left'  in self.keybinds and keys[self.keybinds['left']]) or
-            ('right' in self.keybinds and keys[self.keybinds['right']])):
-
+        if self.accelerating == True:
+            # this is the rotation physics for when the bot is "in gear"
+            # and driving more momentum into the rotation
             speedMean = 0;
             scalar = self.vx*self.collisionDirectionY - self.vy*self.collisionDirectionX;
             scalar2 = self.vx*self.collisionDirectionX + self.vy*self.collisionDirectionY;
 
+            # if the contact to round is along the x-axis
             self.vx = scalar2 * self.collisionDirectionX;
             self.vy = scalar2 * self.collisionDirectionY;
 
@@ -190,8 +238,12 @@ class Spherebot(Bot):
             self.vx += friction*speedMean * (self.collisionDirectionY);
             self.omega = friction*speedMean/self.radius;
         
-        else:
+        else: # The bot is coasting
+            # This is a cross product. It is used to measure how much of the bot's linear
+            # velocity is contributing to rotation (tangential velocity) around the contact point.
             scalar = self.vx*self.collisionDirectionY - self.vy*self.collisionDirectionX;
+            # Higher friction means more rotational velocity is generated from the same linear velocity (rolling vs. skidding)
+            # Larger spheres will rotate more slowly for the same amount of linear velocity.
             self.omega = friction*scalar/self.radius;
         pass
 

@@ -4,10 +4,11 @@ import pygame
 import math
 from dataclasses import dataclass
 from roller.datatypes import Point
+from roller.places import places
 from roller import colors
 from roller.calculations import (
     get_line_pixels, 
-    get_first_solid_pixel,
+    get_lidar_return,
     get_line_endpoint,
     screen2world,
     world2screen
@@ -51,8 +52,8 @@ class Sensor:
     def enable(self):
         """Enable the sensor."""
         self.is_enabled = True
-        return self
         print(f"{self.__class__.__name__} enabled.")
+        return self
 
     def toggle(self):
         self.is_enabled = not self.is_enabled
@@ -104,21 +105,11 @@ class SpectraScan_LX1(Sensor):
             self.range = range
             self.model: str = self.__class__.__name__
 
-
-
     def run(self, bot, world):
-            
-            end_point = get_line_endpoint(bot, self.range, self.mount_angle + bot.phi)
-            ray_points = get_line_pixels(bot, end_point)
-
-            for point in ray_points:
-                pixel_color = world.surface.get_at(point)
-                if colors.is_ground_color(pixel_color):
-                    pygame.draw.circle(world.interpretation, self.color, point, 1)  # Clear circle with full transparency
-                    if self.shows_ray:
-                        # the range on the single laser if higer than SpectraScan_SX30, so the ray is more opaque
-                        pygame.draw.line(world.interpretation, self.color + (60,), (bot.x,bot.y), point, 2)
-                    break
+        point = get_lidar_return(bot, self.range, self.mount_angle+bot.phi, world)
+        if point:
+            pygame.draw.circle(world.interpretation, self.color, point, 1)  # Clear circle with full transparency
+            pygame.draw.line(world.interpretation, self.color + (60,), (bot.x,bot.y), point, 2)
 
 
 class SpectraScan_SX30(Sensor):
@@ -138,7 +129,7 @@ class SpectraScan_SX30(Sensor):
 
         for theta in np.linspace(0, 2*math.pi, num=self.laser_count):
 
-            point = get_first_solid_pixel(bot, self.range, theta, world)
+            point = get_lidar_return(bot, self.range, theta, world)
             if point != None:
                 pygame.draw.circle(world.interpretation, self.color, point, 1) 
                 if self.shows_ray:
@@ -168,7 +159,7 @@ class FOTIRS(Sensor):
     def run(self, bot, world):
 
         for theta in np.linspace(0, math.pi, num=self.laser_count):
-            point = get_first_solid_pixel(bot, 200, theta, world)
+            point = get_lidar_return(bot, 200, theta, world)
             if point != None:
                 pygame.draw.circle(world.interpretation, self.color, point, 1)
 
@@ -184,17 +175,17 @@ class NAV1_InertiaCore(Sensor):
 
     def run(self, bot, world):
 
-        sensor_location = get_line_endpoint(bot, bot.radius, bot.phi)
+        sensor_location = get_line_endpoint(bot, bot.radius*4/5, bot.phi + self.mount_angle)
         pygame.draw.circle(world.memory, self.color, sensor_location, 1) 
 
     def render(self, bot, world, screen):
         if not self.is_enabled:
             return
         
-        x = bot.x + math.cos(bot.phi)*bot.radius*0.7
-        y = bot.y + math.sin(bot.phi)*bot.radius*0.7
-
-        sensor_xy = world2screen(Point(x,y), world)
+        # the sensor size is radium/5 so scale appropriatly to the size of the bot
+        # we add the mount angle to bot.phi so the sensor spins with the spherebot
+        sensor_xy = get_line_endpoint(bot, bot.radius*4/5, bot.phi + self.mount_angle)
+        sensor_xy = world2screen(sensor_xy, world)
         pygame.draw.circle(screen, self.color, sensor_xy, bot.radius/5)
 
         

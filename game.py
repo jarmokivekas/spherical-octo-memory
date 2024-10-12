@@ -11,19 +11,13 @@ from roller.spherebot import Spherebot, Bot
 from roller.overlay import Overlay
 from roller.conditions import g_player_conditions
 from roller.datatypes import Point
+from roller.config import g_config
 from roller import colors
 from roller import sensors
 from roller import characters
 from roller import camera
+from roller import material
 
-config = {
-    # "fps": 1,
-    "fps": 60,
-    "gravity_acceleration": 1, # acceleration in pixels / second^2
-    "height": 0,
-    "width": 0,
-    "debug": False,
-}
 
 
 
@@ -47,7 +41,7 @@ def drawWorld(world):
 
     screen.fill(colors.black)
 
-    if config['debug']:
+    if g_config.debug:
         screen.blit(world.surface, (world.x, world.y))
 
     if g_player_conditions["you have a memory bank for sensor data"]:
@@ -99,11 +93,11 @@ def drawSpherebot(bot: Bot):
     for sensor in bot.sensors:
         sensor.render(bot, world, screen)
 
-    if config['debug']:
+    if g_config.debug:
         # draw the center of the bot position
         pygame.draw.circle(screen, bot.accent_color, origin, 2)
 
-    if config['debug']:
+    if g_config.debug:
         collsion_center_xy = (
             origin.x + bot.collisionDirectionX * bot.closest_pixel_distance,
             origin.y + bot.collisionDirectionY * bot.closest_pixel_distance
@@ -120,8 +114,10 @@ def handle_events(bot):
 
         # Check for key presses to toggle sensors
 
-        if event.type == pygame.KEYDOWN:
+        elif event.type == pygame.KEYDOWN:
         
+            print(event.key)
+
             sensor_count = len(bot.sensors)
             if event.key == pygame.K_1 and sensor_count > 0:
                 bot.sensors[0].toggle()
@@ -143,7 +139,6 @@ def handle_events(bot):
                 bot.sensors[8].toggle()
             elif event.key == pygame.K_0 and sensor_count > 9:
                 bot.sensors[9].toggle()
-    
 
             elif event.key == pygame.K_ESCAPE:  # Exit fullscreen on ESC key press
                 RUNNING = False
@@ -166,16 +161,18 @@ def execute_tick(world, screen):
         # TODO: This should be a more generic "physics tick"
         # for entities. Not all of them need collide and rotate physics
 
-
+        ## Run physics
         if (entity.touch(world)):
             entity.collide(world);
             entity.rotate();
-
         entity.move();
         
+        entity.run_behaviours()
+        
+        ambient_temperature = material.get_temperature_at(entity, world)
         for sensor in entity.sensors:
             sensor.update_temperature(
-                g_ambient_temperature,
+                ambient_temperature,
                 (g_current_tick_ms - g_previous_tick_ms) / 1000
             )
 
@@ -195,14 +192,28 @@ if __name__ == "__main__":
     # Initialize Pygame
     pygame.init()
 
+
     # Set up the game window
-    # screen = pygame.display.set_mode((config['width'], config['height']))
-    screen = pygame.display.set_mode((0,0), pygame.FULLSCREEN)
-    config['width'] = pygame.display.Info().current_w
-    config['height'] = pygame.display.Info().current_h
+    if g_config.fullscreen:
+        screen = pygame.display.set_mode((0,0), pygame.FULLSCREEN)
+    else:
+        screen = pygame.display.set_mode((g_config.width, g_config.height))
+    g_config.width = pygame.display.Info().current_w
+    g_config.height = pygame.display.Info().current_h
 
     # Set up the game clock
     clock = pygame.time.Clock()
+
+    # Game pad/controller support
+    pygame.joystick.init()
+
+    # Check for connected joysticks/controllers
+    if pygame.joystick.get_count() > 0:
+        g_joystick = pygame.joystick.Joystick(0)  # 0 represents the first connected joystick
+        g_joystick.init()
+
+        print(f"Controller found: {g_joystick.get_name()}")
+        characters.player1.joystick = g_joystick
 
 
     world_surface = pygame.image.load('roller/assets/map5.png').convert()
@@ -227,12 +238,10 @@ if __name__ == "__main__":
     g_entities = [
         characters.player1,
         # characters.player2,
-        characters.aros,
+        characters.Aros,
+        characters.Skiv,
     ]
 
-    # this will eventually be information part of the world map
-    # TODO: use global GameConfig() instead
-    g_ambient_temperature = 25
 
     g_current_tick_ms = 0
     g_previous_tick_ms = 0
@@ -251,7 +260,7 @@ if __name__ == "__main__":
         pygame.display.flip()  # Update the display
 
         # Cap the frame rate
-        clock.tick(config['fps'])
+        clock.tick(g_config.fps)
 
     # Clean up
     pygame.quit()
