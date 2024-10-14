@@ -1,8 +1,13 @@
 
 from roller.datatypes import Point
 from roller.config import g_config
+from roller.spherebot import Bot
 
 class Camera:
+
+    targets = []
+    target_index = 0
+
     def __init__(self, x=0, y=0, target_x=0, target_y=0):
         # world coordinates of the camera position.
         # This point will be rendered in the middle of the screen
@@ -34,8 +39,8 @@ class Camera:
         :param dt: Time step (time since the last update, seconds)
         """
         # Compute errors for both axes
-        error_x = self.target_x - self.x
-        error_y = self.target_y - self.y
+        error_x = self.goal_x - self.x
+        error_y = self.goal_y - self.y
 
         # Update integral (cumulative error)
         self.integral_x += error_x * dt
@@ -57,9 +62,36 @@ class Camera:
         self.previous_error_x = error_x
         self.previous_error_y = error_y
 
-    def set_target(self, target: Point):
+    def set_goal(self, goal: Point):
         """
-        Sets a new target position for the camera.
+        Sets a new goal position for the camera.
         """
-        self.target_x = target.x
-        self.target_y = target.y
+        self.goal_x = goal.x
+        self.goal_y = goal.y
+    
+    def add_target(self, target: Point|Bot):
+        assert(hasattr(target, "x"))
+        assert(hasattr(target, "y"))
+        self.targets.append(target)
+    
+    def trasfer_joystick(self, source: Bot, destination: Bot):
+        assert(destination.joystick == None, "attempting to steal bot contol for  other player")
+        destination.joystick = source.joystick
+        source.joystick = None
+
+    def focus_next_target(self):
+        # increment the target inxex, but loop back to 0 if index overdlows
+        # TODO: this should later make check if the entities have a data link
+        # to determine if focus can be moved due to lore reasons.
+        previous_target = self.targets[self.target_index]
+        self.target_index = (self.target_index + 1) % len(self.targets)
+        self.set_goal(self.targets[self.target_index])
+        self.trasfer_joystick(previous_target, self.targets[self.target_index])
+
+    def focus_previous_target(self):
+
+        previous_target = self.targets[self.target_index]
+        self.target_index = self.target_index - 1
+        self.target_index = len(self.targets) - 1 if self.target_index < 0 else self.target_index 
+        self.set_goal(self.targets[self.target_index])
+        self.trasfer_joystick(previous_target, self.targets[self.target_index])

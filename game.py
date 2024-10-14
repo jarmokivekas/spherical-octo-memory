@@ -1,6 +1,7 @@
 import pygame
 import math
 import numpy as np
+import json
 
 from pygame.locals import *
 from dataclasses import dataclass
@@ -143,16 +144,39 @@ def handle_events(bot):
             elif event.key == pygame.K_ESCAPE:  # Exit fullscreen on ESC key press
                 RUNNING = False
 
+        elif event.type == pygame.JOYBUTTONDOWN:
+            print(f"Button {event.button} pressed.")
+            sensor_count = len(bot.sensors)
+            if event.button == 0 and sensor_count > 0:
+                bot.sensors[0].toggle()
+            elif event.button == 1 and sensor_count > 1:
+                bot.sensors[1].toggle()
+            elif event.button == 2 and sensor_count > 2:
+                bot.sensors[2].toggle()
+            elif event.button == 2 and sensor_count > 2:
+                bot.sensors[3].toggle()
+
+            # Note that this does not take into account
+            # which controller presses the button. all palyers
+            # will be able to move the camera. 
+            # TODO: the current implementation will always keep the same 
+            # joystick for the entiry that has camera focus.
+            # TODO: bug don't overrrite the joystic attribute of an entiry that already has 
+            # a joystick assigned to it.
+            elif event.button == 4:
+                g_camera.focus_next_target()
+            elif event.button == 5:
+                g_camera.focus_previous_target()
+
+
 
 def execute_tick(world, screen):
 
     # We move the world on it's own, so the world is not moving between processing
     # one entity and the next
-    for entity in g_entities:
-        if entity.has_camera:
-            g_camera.set_target(entity)
-            g_camera.update_pid((g_current_tick_ms - g_previous_tick_ms)/1000)
-            g_camera.move(world, screen)
+    g_camera.set_goal(g_camera.targets[g_camera.target_index])
+    g_camera.update_pid((g_current_tick_ms - g_previous_tick_ms)/1000)
+    g_camera.move(world, screen)
 
     handle_events(characters.player1)
     drawWorld(world)
@@ -204,16 +228,29 @@ if __name__ == "__main__":
     # Set up the game clock
     clock = pygame.time.Clock()
 
+    # Create playble characters and other entities
+    g_entities = [
+        characters.player1,
+        # characters.player2,
+        characters.Aros,
+        characters.Skiv,
+    ]
+
     # Game pad/controller support
     pygame.joystick.init()
 
     # Check for connected joysticks/controllers
-    if pygame.joystick.get_count() > 0:
-        g_joystick = pygame.joystick.Joystick(0)  # 0 represents the first connected joystick
-        g_joystick.init()
-
-        print(f"Controller found: {g_joystick.get_name()}")
-        characters.player1.joystick = g_joystick
+    for joystick_index in range(0, pygame.joystick.get_count()):
+        # if there are 0 controllers, this loop will not be executed.
+        joystick = pygame.joystick.Joystick(joystick_index)  # 0 represents the first connected joystick
+        joystick.init()
+        # assign the controller to one of the character entities 
+        # starting in order of appearance
+        g_entities[joystick_index].joystick = joystick
+        print(json.dumps(dict(
+            name = joystick.get_name(),
+            instance_id = joystick.get_instance_id(),
+        ), indent = 4))
 
 
     world_surface = pygame.image.load('roller/assets/map5.png').convert()
@@ -232,16 +269,12 @@ if __name__ == "__main__":
     overlay = Overlay(screen)
 
     # contols which part of the world is rendered on screen
+
+
     g_camera = camera.Camera()
-
-    # Create playble characters and other entities
-    g_entities = [
-        characters.player1,
-        # characters.player2,
-        characters.Aros,
-        characters.Skiv,
-    ]
-
+    g_camera.add_target(characters.player1)
+    g_camera.add_target(characters.Aros)
+    g_camera.add_target(characters.Skiv)
 
     g_current_tick_ms = 0
     g_previous_tick_ms = 0

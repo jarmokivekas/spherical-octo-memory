@@ -83,6 +83,8 @@ Skiv  = Spherebot(
     sensors = [
         sensors.NAV1_InertiaCore(color=colors.Cyberpunk.pink),
         sensors.NAV1_InertiaCore(color=colors.Cyberpunk.pink, mount_angle=math.pi),
+        sensors.SpectraScan_LX1(color=colors.Cyberpunk.pink, mount_angle=math.pi/2),
+        sensors.SpectraScan_LX1(color=colors.Cyberpunk.pink, mount_angle=3*math.pi/2),
     ],
 
 )

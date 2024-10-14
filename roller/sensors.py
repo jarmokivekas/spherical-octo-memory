@@ -52,18 +52,15 @@ class Sensor:
     def enable(self):
         """Enable the sensor."""
         self.is_enabled = True
-        print(f"{self.__class__.__name__} enabled.")
         return self
 
     def toggle(self):
         self.is_enabled = not self.is_enabled
-        print(f"{self.__class__.__name__} toggled.")
         return self
         
     def disable(self):
         """Disable the sensor."""
         self.is_enabled = False
-        print(f"{self.__class__.__name__} disabled.")
         return self
 
     def get_status(self):

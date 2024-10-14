@@ -75,9 +75,9 @@ class Spherebot(Bot):
             vx = round(self.vx, 1),
             omega = round(self.omega, 1),
             phi = round(self.phi, 1),
-            input = {
-                "joystick0": self.joystick.get_axis(0),
-            },
+            # input = {
+            #     "joystick0": self.joystick.get_axis(0),
+            # },
         )
         housekeeping['sensors'] = []
         for sensor in self.sensors:
@@ -111,12 +111,10 @@ class Spherebot(Bot):
         if self.joystick is not None:
             # axis_value is between 1.0...-1.0
             axis_value = self.joystick.get_axis(0)
-            # Dead zone check
-            if abs(axis_value) > 0.1:  # Only proceed if outside dead zone
-                if axis_value < 0:  # Move left
-                    self.accelerate_left(gain=2.0*abs(axis_value))
-                elif axis_value > 0:  # Move right
-                    self.accelerate_right(gain=2.0*abs(axis_value))
+            if axis_value < 0:  # Move left
+                self.accelerate_left(gain=2.0*abs(axis_value))
+            elif axis_value > 0:  # Move right
+                self.accelerate_right(gain=2.0*abs(axis_value))
     
         # Keyboard input for movement
         keys = pygame.key.get_pressed()
