@@ -73,25 +73,20 @@ class Camera:
         assert(hasattr(target, "x"))
         assert(hasattr(target, "y"))
         self.targets.append(target)
-    
-    def trasfer_joystick(self, source: Bot, destination: Bot):
-        assert(destination.joystick == None, "attempting to steal bot contol for  other player")
-        destination.joystick = source.joystick
-        source.joystick = None
+
+    def get_target(self):
+        return self.targets[self.target_index]
 
     def focus_next_target(self):
         # increment the target inxex, but loop back to 0 if index overdlows
         # TODO: this should later make check if the entities have a data link
         # to determine if focus can be moved due to lore reasons.
-        previous_target = self.targets[self.target_index]
         self.target_index = (self.target_index + 1) % len(self.targets)
         self.set_goal(self.targets[self.target_index])
-        self.trasfer_joystick(previous_target, self.targets[self.target_index])
 
     def focus_previous_target(self):
-
-        previous_target = self.targets[self.target_index]
+        # select the previous target
         self.target_index = self.target_index - 1
+        # handle underflow for indexes < 0
         self.target_index = len(self.targets) - 1 if self.target_index < 0 else self.target_index 
         self.set_goal(self.targets[self.target_index])
-        self.trasfer_joystick(previous_target, self.targets[self.target_index])

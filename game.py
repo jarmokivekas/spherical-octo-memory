@@ -160,14 +160,40 @@ def handle_events(bot):
             # which controller presses the button. all palyers
             # will be able to move the camera. 
             # TODO: the current implementation will always keep the same 
-            # joystick for the entiry that has camera focus.
-            # TODO: bug don't overrrite the joystic attribute of an entiry that already has 
+            # joystick for the entity that has camera focus.
+            # TODO: bug don't overrrite the joystick attribute of an entity that already has 
             # a joystick assigned to it.
             elif event.button == 4:
                 g_camera.focus_next_target()
+                new_target = g_camera.get_target()
+                if new_target.joystick == None:
+                    transfer_control(new_target, event.instance_id)
+
             elif event.button == 5:
                 g_camera.focus_previous_target()
+                new_target = g_camera.get_target()
+                if new_target.joystick == None:
+                    transfer_control(new_target, event.instance_id)
 
+
+def transfer_control(destination: Bot, joystick_instance_id: int):
+    for entity in g_entities:
+        if entity.joystick == None:
+            continue
+        if entity.joystick.get_instance_id() == joystick_instance_id:
+            destination.joystick = entity.joystick
+            entity.joystick = None
+            assert(entity != destination, "Trying to move joystick control from an entity to itself")
+            return
+    assert(False, "joystick instance id is not assocciated with any playable entity")
+
+def trasfer_joystick(source: Bot, destination: Bot):
+    """Moves joystick control from one bot to an other.
+    The source bot will be left with no joystick object to control it."""
+
+    assert(destination.joystick == None, "attempting to steal bot contol for  other player")
+    destination.joystick = source.joystick
+    source.joystick = None
 
 
 def execute_tick(world, screen):
@@ -202,9 +228,8 @@ def execute_tick(world, screen):
 
         drawSpherebot(entity)
 
-    for entity in g_entities:
-        if entity.has_camera:
-            overlay.render_housekeeping(entity.get_housekeeping())
+
+    overlay.render_housekeeping(g_camera.targets[g_camera.target_index].get_housekeeping())
 
 
 
