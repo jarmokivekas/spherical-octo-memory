@@ -13,4 +13,7 @@ class GameConfig:
     height: int = 600        # window size if not in full screen mode
     width: int = 800
 
+    mixer_sample_frequency = 44100 
+    mixer_datatype = -16
+
 g_config = GameConfig()

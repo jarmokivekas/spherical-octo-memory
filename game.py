@@ -2,7 +2,7 @@ import pygame
 import math
 import numpy as np
 import json
-
+import random
 from pygame.locals import *
 from dataclasses import dataclass
 from typing import List
@@ -18,7 +18,7 @@ from roller import sensors
 from roller import characters
 from roller import camera
 from roller import material
-
+from roller import sounds
 
 
 
@@ -177,6 +177,9 @@ def handle_events(bot):
 
 
 def transfer_control(destination: Bot, joystick_instance_id: int):
+    """Sets the joystick object matching the instance id to control the given bot.
+    Also ensures the joystick object is not left controlling any other bots"""
+
     for entity in g_entities:
         if entity.joystick == None:
             continue
@@ -197,6 +200,9 @@ def trasfer_joystick(source: Bot, destination: Bot):
 
 
 def execute_tick(world, screen):
+    """runs and controls calls to all the main submodules of the game,
+    implementing the logic for each game tick. intended to be call
+    once per frame to run the game."""
 
     # We move the world on it's own, so the world is not moving between processing
     # one entity and the next
@@ -233,10 +239,24 @@ def execute_tick(world, screen):
 
 
 
+SAMPLE_RATE = 44100  # Standard sample rate for audio (44.1 kHz)
+DURATION = 5  # Duration of each note in seconds
+VOLUME = 0.5  # Volume for output
+
+# Generate a sine wave for a given frequency
+def generate_sine_wave(freq, duration, sample_rate=SAMPLE_RATE, volume=VOLUME):
+    t = np.linspace(0, duration, int(sample_rate * duration), False)
+    wave = np.sin(2 * np.pi * freq * t) * volume
+    return wave.astype(np.float32)
+
 
 
 if __name__ == "__main__":
 
+
+    # Initialize Pygame and the mixer for sound output
+    # 44.1kHz, 16-bit signed, mono sound
+    pygame.mixer.pre_init(g_config.mixer_sample_frequency, -16, 1, 1024)
 
     # Initialize Pygame
     pygame.init()
@@ -294,6 +314,39 @@ if __name__ == "__main__":
     overlay = Overlay(screen)
 
     # contols which part of the world is rendered on screen
+
+
+    # Generate a 440Hz sine wave for 1 second
+    frequency = 440  # A4 note (standard tuning)
+    duration = 1.0   # 1 second
+    waveform = sounds.generate_sine_wave(frequency, duration)
+
+    waveform = sounds.generate_modulated_sine_wave(110, 220, 1.0)
+    waveform = sounds.combine_waves_normalized(waveform, sounds.generate_white_noise(1.0, amplitude=2**16/32))
+    waveform = sounds.apply_amplitude_envelope(waveform,0.1,0.5)
+    # Play the sound
+    sounds.play_sound(waveform)
+
+
+ 
+
+
+    # List of frequencies for a slow arpeggio in a pentatonic scale
+    frequencies = [261.63, 293.66, 329.63, 392.00, 440.00]  # C major pentatonic
+
+    # Generate waves for each frequency, then combine them
+    waves = []
+    for freq in frequencies:
+        duration = random.uniform(2,5)
+        waves.append(sounds.generate_sine_wave(freq, duration))
+
+    # Combine waves with a delay for the arpeggio effect
+    combined_wave = np.concatenate(waves)
+
+    # Output sound with Pygame
+    sound = pygame.sndarray.make_sound((combined_wave * 32767).astype(np.int16))
+    sound.play(-1)  # Loop indefinitely
+
 
 
     g_camera = camera.Camera()
