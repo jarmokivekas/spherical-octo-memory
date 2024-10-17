@@ -2,6 +2,9 @@ import numpy as np
 import pygame
 import random
 
+def note_frequency(n):
+    return 440*2**(n/12)
+
 def combine_waves_scaled(*waves):
     num_waves = len(waves)
     
@@ -36,11 +39,12 @@ def apply_echo(wave, delay, decay, sample_rate):
     echoed_wave[echo_samples:] += decay * wave
     return echoed_wave[:len(wave)] *0.5 # Ensure it's the original length
 
-def generate_layered_tone(base_freq, sample_rate, duration, detune=0.5):
+def generate_layered_tone(base_freq,duration, detune=1, wave_count=5, sample_rate=44100):
     t = np.linspace(0, duration, int(sample_rate * duration), False)
-    wave1 = np.sin(2 * np.pi * base_freq * t)
-    wave2 = np.sin(2 * np.pi * (base_freq + detune) * t)  # Detuned wave
-    return (wave1 + wave2) * 0.5  # Normalize to avoid clipping
+    waves = np.zeros_like(t)
+    for detune in np.linspace(-detune, detune, wave_count):
+        waves += np.sin(2 * np.pi * (base_freq + detune) * t)  # Detuned wave
+    return waves / wave_count  # Normalize to avoid clipping
 
 def low_pass_filter(wave, cutoff_freq, sample_rate):
     rc = 1 / (2 * np.pi * cutoff_freq)
@@ -74,7 +78,7 @@ def generate_ambient_music(frequencies, sample_rate, duration):
         freq = random.choice(frequencies)
         note_duration = np.random.uniform(1, 3)  # Randomize note lengths
         # wave = generate_sine_wave(freq, note_duration, sample_rate)
-        wave = generate_layered_tone(freq, duration=note_duration, sample_rate=sample_rate)
+        wave = generate_layered_tone(freq, duration=note_duration)
         # wave = apply_adsr(wave, sample_rate)
         # wave = low_pass_filter(wave, cutoff_freq=500, sample_rate=sample_rate)
         # wave = apply_echo(wave, delay= 0.01, decay=0.2, sample_rate=sample_rate)
@@ -82,8 +86,12 @@ def generate_ambient_music(frequencies, sample_rate, duration):
 
     return np.concatenate(waves)
 
+
+print([note_frequency(n) for n in range(0,13)])
+
 # Parameters
 sample_rate = 44100
+
 frequencies = [392, 440, 493.88, 587.33, 659.25]  # G Major Pentatonic
 
 # Generate music and output

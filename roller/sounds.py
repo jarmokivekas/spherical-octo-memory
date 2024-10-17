@@ -1,6 +1,17 @@
 import numpy as np
 import pygame
 
+from roller.config import g_config
+
+sample_rate = g_config.mixer_sample_frequency
+
+def play_sound(waveform, sample_rate=sample_rate):
+    """Plays a sound from a NumPy array using Pygame"""
+    sound = pygame.sndarray.make_sound(waveform)
+    sound.play()
+
+
+
 def combine_waves(*waves):
     return sum(waves).astype(np.int16)
 
@@ -24,13 +35,17 @@ def combine_waves_normalized(*waves):
     
     return combined_wave.astype(np.int16)
 
-def play_sound(waveform, sample_rate=44100):
-    """Plays a sound from a NumPy array using Pygame"""
-    sound = pygame.sndarray.make_sound(waveform)
-    sound.play()
+
+def low_pass_filter(wave, cutoff_freq, sample_rate):
+    rc = 1 / (2 * np.pi * cutoff_freq)
+    alpha = sample_rate * rc / (sample_rate * rc + 1)
+    filtered_wave = np.zeros_like(wave)
+    for i in range(1, len(wave)):
+        filtered_wave[i] = alpha * wave[i] + (1 - alpha) * filtered_wave[i - 1]
+    return filtered_wave
 
 
-def generate_sine_wave(frequency, duration, sample_rate=44100, amplitude=32767):
+def generate_sine_wave(frequency, duration, sample_rate=sample_rate, amplitude=32767):
     """
     Generates a sine wave of a specific frequency and duration.
     - frequency: Frequency of the sine wave in Hertz
@@ -63,6 +78,14 @@ def generate_modulated_sine_wave(frequency_start, frequency_end, duration, sampl
 
     return wave.astype(np.int16)
 
+def generate_layered_tone(base_freq,duration, detune=1, wave_count=5, sample_rate=44100):
+    t = np.linspace(0, duration, int(sample_rate * duration), False)
+    waves = np.zeros_like(t)
+    for detune in np.linspace(-detune, detune, wave_count):
+        waves += np.sin(2 * np.pi * (base_freq + detune) * t)  # Detuned wave
+    return waves / wave_count  # Normalize to avoid clipping
+
+
 def apply_amplitude_envelope(wave, attack_time, decay_time, sample_rate=44100):
     num_samples = len(wave)
     envelope = np.ones(num_samples)
@@ -76,6 +99,28 @@ def apply_amplitude_envelope(wave, attack_time, decay_time, sample_rate=44100):
     envelope[-decay_samples:] = np.linspace(1, 0, decay_samples)
 
     return (wave * envelope).astype(np.int16)
+
+
+
+def apply_adsr(wave, sample_rate, attack=0.3, decay=0.5, sustain_level=0.3, release=0.5):
+    length = len(wave)
+    adsr = np.ones(length)
+    attack_samples = int(attack * sample_rate)
+    decay_samples = int(decay * sample_rate)
+    release_samples = int(release * sample_rate)
+    
+    # Attack phase (fade in)
+    adsr[:attack_samples] = np.linspace(0, 1, attack_samples)
+    
+    # Decay phase
+    adsr[attack_samples:attack_samples+decay_samples] = np.linspace(1, sustain_level, decay_samples)
+    
+    # Release phase (fade out)
+    adsr[-release_samples:] = np.linspace(sustain_level, 0, release_samples)
+    
+    # Apply envelope to the wave
+    return wave * adsr
+
 
 def generate_white_noise(duration, sample_rate=44100, amplitude=32767):
     num_samples = int(sample_rate * duration)
