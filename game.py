@@ -79,31 +79,6 @@ def drawWorld(world):
 
 
 
-def drawSpherebot(bot: Bot):
-    # main body of the bot
-    if bot.has_camera and not g_player_conditions['you are aware you are a robot']:
-        # we don't render the bot until it has become aware that it is a bot
-        return
-
- 
-    #TODO: if this is outside the screen (by some buffer, just return and don't render)
-    origin = world2screen(bot, world)
-    
-    pygame.draw.circle(screen, bot.color, origin, bot.radius)
-
-    for sensor in bot.sensors:
-        sensor.render(bot, world, screen)
-
-    if g_config.debug:
-        # draw the center of the bot position
-        pygame.draw.circle(screen, bot.accent_color, origin, 2)
-
-    if g_config.debug:
-        collsion_center_xy = (
-            origin.x + bot.collisionDirectionX * bot.closest_pixel_distance,
-            origin.y + bot.collisionDirectionY * bot.closest_pixel_distance
-        )
-        pygame.draw.circle(screen, (255,128,0), collsion_center_xy, 2)
 
 
 def handle_events(bot):
@@ -163,13 +138,13 @@ def handle_events(bot):
             # joystick for the entity that has camera focus.
             # TODO: bug don't overrrite the joystick attribute of an entity that already has 
             # a joystick assigned to it.
-            elif event.button == 4:
+            elif event.button == 5:
                 g_camera.focus_next_target()
                 new_target = g_camera.get_target()
                 if new_target.joystick == None:
                     transfer_control(new_target, event.instance_id)
 
-            elif event.button == 5:
+            elif event.button == 4:
                 g_camera.focus_previous_target()
                 new_target = g_camera.get_target()
                 if new_target.joystick == None:
@@ -203,7 +178,6 @@ def execute_tick(world, screen):
     """runs and controls calls to all the main submodules of the game,
     implementing the logic for each game tick. intended to be call
     once per frame to run the game."""
-
     # We move the world on it's own, so the world is not moving between processing
     # one entity and the next
     g_camera.set_goal(g_camera.targets[g_camera.target_index])
@@ -217,12 +191,8 @@ def execute_tick(world, screen):
         # TODO: This should be a more generic "physics tick"
         # for entities. Not all of them need collide and rotate physics
 
-        ## Run physics
-        if (entity.touch(world)):
-            entity.collide(world);
-            entity.rotate();
-        entity.move();
-        
+        entity.run_physics(world)
+
         entity.run_behaviours()
         
         ambient_temperature = material.get_temperature_at(entity, world)
@@ -232,8 +202,7 @@ def execute_tick(world, screen):
                 (g_current_tick_ms - g_previous_tick_ms) / 1000
             )
 
-        drawSpherebot(entity)
-
+        entity.render(world,screen)
 
     overlay.render_housekeeping(g_camera.targets[g_camera.target_index].get_housekeeping())
 
@@ -279,14 +248,22 @@ if __name__ == "__main__":
         # characters.player2,
         characters.Aros,
         characters.Skiv,
+        characters.elevator1,
     ]
+
+    g_camera = camera.Camera()
+    g_camera.add_target(characters.player1)
+    g_camera.add_target(characters.Aros)
+    g_camera.add_target(characters.Skiv)
+    g_camera.add_target(characters.elevator1)
+
 
     # Game pad/controller support
     pygame.joystick.init()
 
     # Check for connected joysticks/controllers
+    # if there are 0 controllers, this loop will not be executed.
     for joystick_index in range(0, pygame.joystick.get_count()):
-        # if there are 0 controllers, this loop will not be executed.
         joystick = pygame.joystick.Joystick(joystick_index)  # 0 represents the first connected joystick
         joystick.init()
         # assign the controller to one of the character entities 
@@ -315,14 +292,6 @@ if __name__ == "__main__":
 
     # contols which part of the world is rendered on screen
 
-
-
-
-
-    g_camera = camera.Camera()
-    g_camera.add_target(characters.player1)
-    g_camera.add_target(characters.Aros)
-    g_camera.add_target(characters.Skiv)
 
     g_current_tick_ms = 0
     g_previous_tick_ms = 0

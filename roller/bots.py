@@ -1,16 +1,16 @@
 import math
 
+import pygame
 from typing import List, Dict
 from dataclasses import dataclass, field
 
 from roller.datatypes import Point
 from roller import colors
-from roller.calculations import vectorProjection, screen2world, clip
+from roller.calculations import vectorProjection, screen2world, world2screen,clip
 from roller.sensors import SpectraScan_SX30, Sensor
 from roller.conditions import g_player_conditions
 from roller.config import g_config
 from roller.behaviours import Behaviour
-import pygame
 
 @dataclass
 class Bot():
@@ -30,6 +30,24 @@ class Bot():
     def get_xy(self):
         return (self.x, self.y)
 
+    def get_housekeeping(self):
+        housekeeping = dict(
+            x = round(self.x, 1),
+            y = round(self.y, 1),
+            vy = round(self.vy, 1),
+            vx = round(self.vx, 1),
+            omega = round(self.omega, 1),
+            phi = round(self.phi, 1),
+            # input = {
+            #     "joystick0": self.joystick.get_axis(0),
+            # },
+        )
+        housekeeping['sensors'] = []
+        for sensor in self.sensors:
+            housekeeping['sensors'].append(sensor.get_housekeeping())
+
+        return housekeeping
+
     def add_behaviour(self, behaviour):
         self.behaviours.append(behaviour)
 
@@ -39,14 +57,59 @@ class Bot():
         self.sensors.append(sensor)
 
     def run_physics(self, world):
+        """How collisions, gravity, etc. physics effect the bot. This will
+        be executed before any player input via a joystick object or Behavious object"""
         raise NotImplementedError()
 
     def run_behaviours(self):
+        """Gets and executes upon player inputs and automated behaviours
+        Player inputs are only executed if the bot has a joystick object associated with it"""
+        if self.joystick != None:
+            self._run_player_input()
+
         for behaviour in self.behaviours:
             behaviour.run()
 
+    def _run_player_input(self):
+        """the player should implement how the inputs from a game controller
+        effect various physics parameters or e.g. operations of a sensor for a 
+        given bot. Different types of bot may want to implement different control schemes"""
+        raise NotImplementedError()
+
     def run_sensors(self, world, screen):
         raise NotImplementedError()
+
+    def render(self, world, screen):
+        """use pygame draw calls to draw the bot and it's sensors onto the game screen"""
+        raise NotImplementedError()
+
+
+class Elevator(Bot):
+
+    def __init__(self, *args, **kwargs):
+        # this passess all other arguments given to this initializer to the 
+        # parent calss to take care of
+        super().__init__(*args, **kwargs)
+    
+    def run_physics(self, world):
+        # move based on velocity
+        self.y += self.vy
+        # apply some friction
+        self.vy *= 0.90
+
+    def _run_player_input(self):
+
+        if self.joystick is not None:
+            # axis_value is between 1.0...-1.0
+            axis_value = self.joystick.get_axis(1)
+            gain = 0.7
+            self.vy += axis_value * gain
+
+    def render(self, world, screen):
+
+        origin = world2screen(self, world)
+        
+        pygame.draw.circle(screen, self.color, origin, 20)
 
 
 
@@ -67,29 +130,19 @@ class Spherebot(Bot):
         super().__init__(*args, **kwargs)
         self.radius = radius
 
-    def get_housekeeping(self):
-        housekeeping = dict(
-            x = round(self.x, 1),
-            y = round(self.y, 1),
-            vy = round(self.vy, 1),
-            vx = round(self.vx, 1),
-            omega = round(self.omega, 1),
-            phi = round(self.phi, 1),
-            # input = {
-            #     "joystick0": self.joystick.get_axis(0),
-            # },
-        )
-        housekeeping['sensors'] = []
-        for sensor in self.sensors:
-            housekeeping['sensors'].append(sensor.get_housekeeping())
-
-        return housekeeping
-
     @property
     def xy(self):
         """just to easily access the xy position for pygame functions"""
         return (self.x, self.y)
 
+    def run_physics(self, world):
+        """Run physics for spherebot. TODO: this implementation still
+        intermingles user input and physics instead of running all physics
+        before user input."""
+        if (self.touch(world)):
+            self.collide(world);
+            self.rotate();
+        
 
     def accelerate_left(self, gain):
         self.accelerating = True
@@ -101,12 +154,10 @@ class Spherebot(Bot):
         return
 
 
-    def move(self):
+    def _run_player_input(self):
         """Move the bot in the world according to it current velocities
         Also apply friction to slow down velocities, and apply
         rotational velocity if the bot has keybinds attached to it"""
-
-        previous_omega = self.omega
 
         if self.joystick is not None:
             # axis_value is between 1.0...-1.0
@@ -245,3 +296,22 @@ class Spherebot(Bot):
             self.omega = friction*scalar/self.radius;
         pass
 
+    def render(self, world, screen):
+
+        origin = world2screen(self, world)
+        
+        pygame.draw.circle(screen, self.color, origin, self.radius)
+
+        for sensor in self.sensors:
+            sensor.render(self, world, screen)
+
+        if g_config.debug:
+            # draw the center of the bot position
+            pygame.draw.circle(screen, self.accent_color, origin, 2)
+
+        if g_config.debug:
+            collsion_center_xy = (
+                origin.x + self.collisionDirectionX * self.closest_pixel_distance,
+                origin.y + self.collisionDirectionY * self.closest_pixel_distance
+            )
+            pygame.draw.circle(screen, (255,128,0), collsion_center_xy, 2)

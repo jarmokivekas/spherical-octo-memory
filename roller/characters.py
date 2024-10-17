@@ -1,6 +1,6 @@
 import pygame
 import math
-from roller.bots import Spherebot
+from roller.bots import Spherebot, Elevator
 from roller.places import places
 from roller import sensors
 from roller import colors
@@ -87,4 +87,11 @@ Skiv  = Spherebot(
         sensors.SpectraScan_LX1(color=colors.Cyberpunk.pink, mount_angle=3*math.pi/2),
     ],
 
+)
+
+elevator1 = Elevator(
+    x = places['map5.png']['elevator'][0],
+    y = places['map5.png']['elevator'][1],
+    color = (50,50,50),
+    sensors = [],
 )
