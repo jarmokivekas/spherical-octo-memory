@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import List
 
 from roller.calculations import vectorProjection, scalarProduct, world2screen
-from roller.spherebot import Spherebot, Bot
+from roller.bots import Spherebot, Bot
 from roller.overlay import Overlay
 from roller.conditions import g_player_conditions
 from roller.datatypes import Point
@@ -316,36 +316,6 @@ if __name__ == "__main__":
     # contols which part of the world is rendered on screen
 
 
-    # Generate a 440Hz sine wave for 1 second
-    frequency = 440  # A4 note (standard tuning)
-    duration = 1.0   # 1 second
-    waveform = sounds.generate_sine_wave(frequency, duration)
-
-    waveform = sounds.generate_modulated_sine_wave(110, 220, 1.0)
-    waveform = sounds.combine_waves_normalized(waveform, sounds.generate_white_noise(1.0, amplitude=2**16/32))
-    waveform = sounds.apply_amplitude_envelope(waveform,0.1,0.5)
-    # Play the sound
-    sounds.play_sound(waveform)
-
-
- 
-
-
-    # List of frequencies for a slow arpeggio in a pentatonic scale
-    frequencies = [261.63, 293.66, 329.63, 392.00, 440.00]  # C major pentatonic
-
-    # Generate waves for each frequency, then combine them
-    waves = []
-    for freq in frequencies:
-        duration = random.uniform(2,5)
-        waves.append(sounds.generate_sine_wave(freq, duration))
-
-    # Combine waves with a delay for the arpeggio effect
-    combined_wave = np.concatenate(waves)
-
-    # Output sound with Pygame
-    sound = pygame.sndarray.make_sound((combined_wave * 32767).astype(np.int16))
-    sound.play(-1)  # Loop indefinitely
 
 
 

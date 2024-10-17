@@ -1,6 +1,6 @@
 import pygame
 import math
-from roller.spherebot import Spherebot
+from roller.bots import Spherebot
 from roller.places import places
 from roller import sensors
 from roller import colors

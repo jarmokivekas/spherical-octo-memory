@@ -1,7 +1,7 @@
 
 from roller.datatypes import Point
 from roller.config import g_config
-from roller.spherebot import Bot
+from roller.bots import Bot
 
 class Camera:
 
