@@ -12,7 +12,7 @@ class GameConfig:
     # set the derivative gain to 0 while changing the bot in camera focus.
     camera_kd: float = 0.0   # Camera movement PID derivative gain
 
-    fullscreen: bool = True
+    fullscreen: bool = False
     height: int = 600        # window size if not in full screen mode
     width: int = 800
 

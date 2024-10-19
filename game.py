@@ -128,7 +128,7 @@ def handle_events(bot):
                 bot.sensors[1].toggle()
             elif event.button == 2 and sensor_count > 2:
                 bot.sensors[2].toggle()
-            elif event.button == 2 and sensor_count > 2:
+            elif event.button == 3 and sensor_count > 3:
                 bot.sensors[3].toggle()
 
             # Note that this does not take into account
@@ -184,7 +184,7 @@ def execute_tick(world, screen):
     g_camera.update_pid((g_current_tick_ms - g_previous_tick_ms)/1000)
     g_camera.move(world, screen)
 
-    handle_events(characters.player1)
+    handle_events(g_camera.targets[g_camera.target_index])
     drawWorld(world)
 
     for entity in g_entities:

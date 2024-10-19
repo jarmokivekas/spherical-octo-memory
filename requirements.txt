@@ -1,1 +1,4 @@
 pygame
+sphinx
+sphinx-apidoc
+sphinx-book-theme

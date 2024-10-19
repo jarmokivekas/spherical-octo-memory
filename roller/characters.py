@@ -1,5 +1,6 @@
 import pygame
 import math
+import numpy as np
 from roller.bots import Spherebot, Elevator
 from roller.places import places
 from roller import sensors
@@ -93,5 +94,26 @@ elevator1 = Elevator(
     x = places['map5.png']['elevator'][0],
     y = places['map5.png']['elevator'][1],
     color = (50,50,50),
-    sensors = [],
+    sensors = [
+        sensors.SpectraScan_LX1(color=colors.Cyberpunk.yellow, mount_angle=math.pi/2),
+        sensors.SpectraScan_LX1(color=colors.Cyberpunk.yellow, mount_angle=3*math.pi/2),
+    ]
+)
+elevator1.add_behaviour(
+    behaviours.OscillateSensor(
+        bot = elevator1,
+        sensor_index = 0,
+        period = 2,
+        phi_min = np.radians(90-20),
+        phi_max = np.radians(90+20),
+    )
+)
+elevator1.add_behaviour(
+    behaviours.OscillateSensor(
+        bot = elevator1,
+        sensor_index = 1,
+        period = 2,
+        phi_min = np.radians(270-20),
+        phi_max = np.radians(270+20),
+    )
 )
