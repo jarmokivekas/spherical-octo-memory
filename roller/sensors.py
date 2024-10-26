@@ -2,8 +2,8 @@ import numpy as np
 import random
 import pygame
 import math
-from dataclasses import dataclass
-from roller.datatypes import Point
+from dataclasses import dataclass, field
+from roller.datatypes import Point, Line
 from roller.places import places
 from roller.config import g_config
 from roller import colors
@@ -26,9 +26,18 @@ class Sensor:
     mass: float          = 0.2           # m, Assumed mass in kg
     heat_capacity: float = 500  # Assumed specific heat capacity in J/(kg*K)
     heat_dissipation_rate:float = 0.1  # Example dissipation rate
+
+    # Other attributes
     color: tuple = colors.cyan
     is_enabled:bool = True             # Whether the sensor is active
     mount_angle: float = 0
+
+    data: list = field(default_factory=list)
+    """Each sensor subclass can determine themselves how to interact with the
+    data buffer that has been provided for them. It may store Point's, """
+    dataindex:int = 0
+
+
     #####################################
     ## Methods childred should implement
     #####################################3
@@ -74,7 +83,7 @@ class Sensor:
         }
 
 
-    def update_temperature(self, ambient_temperature, dt):
+    def update_temperature(self, ambient_temperature:float, dt:float):
         # Calculate heat generated
         
         heat_generated = self.power_draw * dt if self.is_enabled else 0
@@ -91,21 +100,38 @@ class Sensor:
     def draw_data(self, world):
         return
 
+    def delete_data(self, index:int):
+        return
+
+    def random_dataindex(self):
+        """choose the next index where lidar data will be written. How this is chosen
+        as a effect on how old data gets overwritten, which has aestethic importance"""
+        return random.randint(0, len(self.data)-1)
+
+    def next_dataindex(self):
+        """returns the incremented data index, and ensures that it wraps correctly when reaching maximum.
+        This indexing strategy always overwrites the oldest data entry, which can make the bot appear
+        "snake like", as the data is deleted at the same pace that the bot is moving."""
+        return (self.dataindex + 1) % len(self.data)
+
+
+
 
 class Lidar(Sensor):
     """(at risk of too much abstraction)
     This is a Sensor class that implements methods common to all Lidar style laser sensors. 
     """
 
-    shows_ray = True
+    shows_rays: bool = True
     """Whether to draw a line from the bot's location to the sensed point, or just the point sensed by the laser.
     This is mostly a aesthetic choice. Having the lines visible makes the world seem more illuminated/bighter"""
+    data: list[Line] = field(default_factory=list)
+    """The sensor's data buffer. Sensor reading are stored in this fixed-size buffer that
+    represents the sensor's built-in memory. For Lidars each data entry is a tuple of two points that represent a line: (ray_start, ray_end)"""
 
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.data = g_config.fps * 10 * [None]
-        self.dataindex = 0
 
     def draw_data(self, world):
         """Draw the visual prepresentation of the data in the sensor's data buffer
@@ -113,13 +139,9 @@ class Lidar(Sensor):
         for line in self.data:
             if not line:
                 continue
-            pygame.draw.circle(world.interpretation, self.color, line[1], 1)
-            if self.shows_ray:
-                pygame.draw.line(world.interpretation, self.color + (30,), line[0], line[1], 1)
-
-    def data_index_next(self):
-        self.dataindex = random.randint(0, len(self.data)-1)
-        self.dataindex = (self.dataindex + 1) % len(self.data)
+            pygame.draw.circle(world.interpretation, self.color, line.end, 1)
+            if self.shows_rays:
+                pygame.draw.line(world.interpretation, self.color + (30,), line.start, line.end, 1)
 
 
 # Specific sensor classes inheriting from the base Sensor class
@@ -134,15 +156,17 @@ class SpectraScan_LX1(Lidar):
         # SpectraScan_SX30-specific attribute
         self.range = range
         self.model: str = self.__class__.__name__
+        self.data = [None] * g_config.fps * 10
 
     def run(self, bot, world):
         point = get_lidar_return(bot, self.range, self.mount_angle+bot.phi, world)
         if point:
-            self.data[self.dataindex] = ((bot.x,bot.y),(point.x, point.y))
-            self.data_index_next()
+            self.data[self.dataindex] = Line(Point(bot.x,bot.y), point)
+            self.dataindex = self.next_dataindex()
 
 class SpectraScan_SX30(Lidar):
     """Meet the SpectraScan-SX30 - your answer to getting lost and running into things! We took thirty of our trusty LX1 rangefinders, packed them into one powerful sensor array, and called it a day. Well... almost. Turns out, cramming that much tech makes it run a little toasty, we had to dial back the range a bit. But hey, it’s still a game-changer for up-close precision."""
+
 
     def __init__(self, range = 300, is_stabilized=True,laser_count = 17, **kwargs):
         # Call the base class constructor
@@ -153,6 +177,7 @@ class SpectraScan_SX30(Lidar):
         self.laser_count = laser_count
         self.model: str = self.__class__.__name__
         self.is_stabilized = is_stabilized
+        self.data = [None] * g_config.fps* 2 * self.laser_count
         #move to base class
 
     def run(self, bot, world):
@@ -160,12 +185,11 @@ class SpectraScan_SX30(Lidar):
             # is the sensor does not have a stabilizer, it will
             # be co-rotating with with the body of the bot
             if not self.is_stabilized:
-                theta += bot.phi
-            
+                theta += bot.phi          
             point = get_lidar_return(bot, self.range, theta, world)
             if point:
-                self.data[self.dataindex] = ((bot.x,bot.y),(point.x, point.y))
-                self.data_index_next()
+                self.data[self.dataindex] = Line(Point(bot.x,bot.y),point)
+                self.dataindex = self.random_dataindex()
 
 class FOTIRS(Sensor):
     """Introducing the Forward-Emitting Optical Terrain Illumination and Reflectivity Sensor (FOTIRS)—a precision-engineered light-based sensor designed to project a controlled beam forward and downward, scanning the terrain ahead for optimal navigation and environmental awareness."""
@@ -191,14 +215,22 @@ class NAV1_InertiaCore(Sensor):
     """ NAV1_InertiaCore – Your Essential Navigation Companion. Need reliable motion tracking without the frills? The NAV1_InertiaCore is built for the everyday robotic explorer. Affordable, simple, and easy to integrate, this unit gives you what you need to get rolling."""
 
     power_draw = 1
-    def __init__(self, laser_count=100, **kwargs):
+
+    data: list[Point] 
+
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.model = self.__class__.__name__
+        self.data = [None]*g_config.fps *20
 
     def run(self, bot, world):
-
+        """The Inertia Core measures the location it is mounted it, which co-rotates with the bot"""
         sensor_location = get_line_endpoint(bot, bot.radius*4/5, bot.phi + self.mount_angle)
-        pygame.draw.circle(world.memory, self.color, sensor_location, 1) 
+        self.dataindex = self.next_dataindex()
+        self.data[self.dataindex] = sensor_location
+
+    def draw_data(self, world):
+        pygame.draw.circle(world.memory, self.color, self.data[self.dataindex], 1) 
 
     def render(self, bot, world, screen):
         if not self.is_enabled:
@@ -208,9 +240,7 @@ class NAV1_InertiaCore(Sensor):
         # we add the mount angle to bot.phi so the sensor spins with the spherebot
         sensor_xy = get_line_endpoint(bot, bot.radius*4/5, bot.phi + self.mount_angle)
         sensor_xy = world2screen(sensor_xy, world)
-        pygame.draw.circle(screen, self.color, sensor_xy, bot.radius/5)
-
-        
+        pygame.draw.circle(screen, self.color, sensor_xy, bot.radius/5)   
 
 class NAV1_GyroSphere(Sensor):
     """NAV1_GyroCore – Precision, Perfected. For those who demand pinpoint accuracy, the NAV1_GyroCore is the flagship of the NAV1 line. Designed with advanced calibration to track your robot's center of mass with unmatched precision, this high-end unit ensures smooth, stable motion data for even the most demanding applications. Whether you're navigating complex terrains or fine-tuning every movement. """
