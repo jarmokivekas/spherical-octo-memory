@@ -21,7 +21,7 @@ player1 = Spherebot(
     color = palette.dark,
     sensors = [
         sensors.SpectraScan_LX1(color = palette.blue).disable() ,
-        sensors.SpectraScan_SX30(color = palette.blue) ,
+        sensors.SpectraScan_SX30(color = palette.blue, laser_count = 16) ,
         # sensors.FOTIRS(),
         # sensors.NAV1_InertiaCore(color = palette.pink).disable() ,
         sensors.NAV1_InertiaCore(color = palette.yellow),

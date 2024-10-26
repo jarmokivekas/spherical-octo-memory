@@ -86,7 +86,7 @@ class LinePlot:
 
         data[self.idx] = point
 
-    def update_plot()
+    def update_plot():
 
         pygame.draw.line(self.surface, self.line_color, scale(self.data[i]), scale(self.data[i+1]), 1)
 
