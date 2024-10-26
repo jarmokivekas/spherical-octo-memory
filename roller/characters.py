@@ -20,11 +20,11 @@ player1 = Spherebot(
     radius = 20,
     color = palette.dark,
     sensors = [
+        sensors.NAV1_InertiaCore(color = palette.yellow),
         sensors.SpectraScan_LX1(color = palette.blue).disable() ,
         sensors.SpectraScan_SX30(color = palette.blue, laser_count = 16) ,
         # sensors.FOTIRS(),
         # sensors.NAV1_InertiaCore(color = palette.pink).disable() ,
-        sensors.NAV1_InertiaCore(color = palette.yellow),
 
     ],
     keybinds = {

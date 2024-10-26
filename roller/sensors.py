@@ -98,10 +98,10 @@ class Sensor:
         self.temperature += net_heat_change / (self.mass * self.heat_capacity)
 
     def draw_data(self, world):
-        return
+        raise NotImplementedError
 
-    def delete_data(self, index:int):
-        return
+    def delete_data(self, index:int, world):
+        raise NotImplementedError
 
     def random_dataindex(self):
         """choose the next index where lidar data will be written. How this is chosen
@@ -143,7 +143,7 @@ class Lidar(Sensor):
             if self.shows_rays:
                 pygame.draw.line(world.interpretation, self.color + (30,), line.start, line.end, 1)
 
-
+    
 # Specific sensor classes inheriting from the base Sensor class
 class SpectraScan_LX1(Lidar):
     """Meet the SpectraScan-LX1, the ultimate single-ray laser range finder, born from a sphere-whacking club-wielding human sport eqpuipment that’s been reverse-engineered, reimagined, and perfected for your everyday robotics sensing needs. 
@@ -225,12 +225,20 @@ class NAV1_InertiaCore(Sensor):
 
     def run(self, bot, world):
         """The Inertia Core measures the location it is mounted it, which co-rotates with the bot"""
-        sensor_location = get_line_endpoint(bot, bot.radius*4/5, bot.phi + self.mount_angle)
         self.dataindex = self.next_dataindex()
-        self.data[self.dataindex] = sensor_location
+        self.delete_data(self.dataindex, world)
+        sensor_location = get_line_endpoint(bot, bot.radius*4/5, bot.phi + self.mount_angle)
+        self.data[self.dataindex] = Point(int(sensor_location.x), int(sensor_location.y))
+
+    def delete_data(self, index, world):
+        if self.data[index] is None:
+            return
+        world.interpretation.set_at(self.data[index], colors.black) 
+        self.data[index] = None
 
     def draw_data(self, world):
-        pygame.draw.circle(world.memory, self.color, self.data[self.dataindex], 1) 
+        world.interpretation.set_at(self.data[self.dataindex], self.color) 
+
 
     def render(self, bot, world, screen):
         if not self.is_enabled:

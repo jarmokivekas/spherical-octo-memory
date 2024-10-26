@@ -37,24 +37,10 @@ LAST_INTERPRETATION_UPDATE_TIME = 0
 
 def drawWorld(world):
     # Drawing
-    global LAST_MEMORY_UPDATE_TIME
-    global LAST_INTERPRETATION_UPDATE_TIME
-
     screen.fill(colors.black)
 
     if g_config.debug:
         screen.blit(world.surface, (world.x, world.y))
-
-    if g_player_conditions["you have a memory bank for sensor data"]:
-        if g_current_tick_ms - LAST_MEMORY_UPDATE_TIME > 20000:
-            LAST_MEMORY_UPDATE_TIME = g_current_tick_ms
-            # Get the pixel array from the surface
-            # and apply brightness reduction to "forget" past sensor data
-            pixels = pygame.surfarray.pixels3d(world.memory)  # For RGB surfaces
-            pixels >>= 1
-            del pixels
-
-    world.interpretation.fill((0,0,0,0))
 
     for entity in g_entities:
         for sensor in entity.sensors:
@@ -62,15 +48,7 @@ def drawWorld(world):
                 sensor.run(entity, world)
             sensor.draw_data(world)
     
-    # for sensor in friend.sensors:
-    #     sensor.run(friend, world)
-    if g_player_conditions["you have a memory bank for sensor data"]:
-        screen.blit(world.memory, (world.x, world.y))
     screen.blit(world.interpretation, (world.x, world.y))
-
-
-
-
 
 def handle_events(bot):
     global RUNNING
