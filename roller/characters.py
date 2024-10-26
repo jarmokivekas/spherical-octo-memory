@@ -1,3 +1,8 @@
+"""The characters module initializes a number of different Bot objects with various sensors and starting locations.
+
+Many of these Bots are mean't to be playable characters that the player can choose with the camera focus mechanic
+"""
+
 import pygame
 import math
 import numpy as np
@@ -58,6 +63,7 @@ Aros  = Spherebot(
         'right': pygame.K_e
     },
 )
+
 Aros.add_behaviour(
     behaviours.Blinking(
         bot = Aros,               # Aros is controlling itself

@@ -64,13 +64,11 @@ class Bot():
     def run_behaviours(self):
         """Gets and executes upon player inputs and automated behaviours
         Player inputs are only executed if the bot has a joystick object associated with it"""
-        if self.joystick != None:
-            self._run_player_input()
 
         for behaviour in self.behaviours:
             behaviour.run()
 
-    def _run_player_input(self):
+    def run_player_input(self):
         """the player should implement how the inputs from a game controller
         effect various physics parameters or e.g. operations of a sensor for a 
         given bot. Different types of bot may want to implement different control schemes"""
@@ -97,7 +95,7 @@ class Elevator(Bot):
         # apply some friction
         self.vy *= 0.90
 
-    def _run_player_input(self):
+    def run_player_input(self):
 
         if self.joystick is not None:
             # axis_value is between 1.0...-1.0
@@ -143,6 +141,20 @@ class Spherebot(Bot):
             self.collide(world);
             self.rotate();
         
+        # friction
+        self.vy *= 0.99;
+        self.vx *= 0.99;
+        self.omega *= 0.95;
+
+        # Gravity
+        self.vy += g_config.gravity_acceleration 
+
+        # Rotate and move
+        self.phi += self.omega;
+        self.x += self.vx;
+        self.y += self.vy;
+
+        
 
     def accelerate_left(self, gain):
         self.accelerating = True
@@ -154,7 +166,7 @@ class Spherebot(Bot):
         return
 
 
-    def _run_player_input(self):
+    def run_player_input(self):
         """Move the bot in the world according to it current velocities
         Also apply friction to slow down velocities, and apply
         rotational velocity if the bot has keybinds attached to it"""
@@ -177,18 +189,6 @@ class Spherebot(Bot):
                 self.accelerate_right(gain=1.0)
 
  
-        # friction
-        self.vy *= 0.99;
-        self.vx *= 0.99;
-        self.omega *= 0.95;
-
-        # Gravity
-        self.vy += g_config.gravity_acceleration 
-
-        # Rotate and move
-        self.phi += self.omega;
-        self.x += self.vx;
-        self.y += self.vy;
 
 
     def touch(self, world):
@@ -262,7 +262,9 @@ class Spherebot(Bot):
 
 
     def rotate(self):
-        
+        """run the physics for how the sphere's translation velocity
+        has an effect on it's rotational velocity when making contact with
+        the ground"""
 
         # Get the state of all keys
         keys = pygame.key.get_pressed()

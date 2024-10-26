@@ -202,6 +202,10 @@ def execute_tick(world, screen):
                 (g_current_tick_ms - g_previous_tick_ms) / 1000
             )
 
+        if entity.joystick != None:
+            entity.run_player_input()
+
+
         entity.render(world,screen)
 
     overlay.render_housekeeping(g_camera.targets[g_camera.target_index].get_housekeeping())
@@ -245,7 +249,6 @@ if __name__ == "__main__":
     # Create playble characters and other entities
     g_entities = [
         characters.player1,
-        # characters.player2,
         characters.Aros,
         characters.Skiv,
         characters.elevator1,

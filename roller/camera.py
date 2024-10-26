@@ -1,21 +1,28 @@
+"""The Camera class controls what part of the current game world is shown
+of the screen. The class takes care of keeping track of the screen coordinates of the world surface"""
 
 from roller.datatypes import Point
 from roller.config import g_config
 from roller.bots import Bot
 
 class Camera:
+    """
+    :param initial_x: The x coordinate of the point in the world surface that will be rendered ay the center of the screen
+    :param initial_y: The y coordinate of the point in the world surface that will be rendered at the center of the screen
+    """
 
     targets = []
+    """A list of Bot of Point objects that can be chosen by the player to be in camera focus and tracked by the camera"""
     target_index = 0
+    """An index to the `self.targets` list that points to the Bot object that is currently being tracked by the camera"""
 
-    def __init__(self, x=0, y=0, target_x=0, target_y=0):
+    def __init__(self, initial_x:int = 0, initial_y:int=0):
         # world coordinates of the camera position.
-        # This point will be rendered in the middle of the screen
-        self.x = x
-        self.y = y
+        self.x = initial_x
+        self.y = initial_y
         # The camera will eventually move here, using the PID loop
-        self.target_x = target_x
-        self.target_y = target_y
+        self.target_x = initial_x
+        self.target_y = initial_y
 
         # PID parameters
         self.kp = g_config.camera_kp   # Proportional gain
@@ -29,14 +36,15 @@ class Camera:
         self.integral_y = 0
 
     def move(self, world, screen):
-        """Moves the world coordinates so that the cameras (x,y) coordiantes are int the middle of the screen"""
+        """Updates the coordinates of the world object so that the camera's (x,y) coordiantes are int the middle of the screen
+        (Since there is no such thing as moving the camera, we just move the world raster in reference to the screen)"""
         world.x = - self.x + screen.get_width()/2
         world.y = - self.y + screen.get_height()/2
 
     def update_pid(self, dt):
         """
-        PID controlled motion to move the camera toward target_x and target_y.
-        :param dt: Time step (time since the last update, seconds)
+        PID controlled motion to move the camera (x,y) toward (target_x, target_y) in a smooth motion.
+        :param dt: Time step. This is the time since the last update in seconds (time between game ticks)
         """
         # Compute errors for both axes
         error_x = self.goal_x - self.x
@@ -62,22 +70,27 @@ class Camera:
         self.previous_error_x = error_x
         self.previous_error_y = error_y
 
-    def set_goal(self, goal: Point):
+    def set_goal(self, goal: Point|Bot):
         """
-        Sets a new goal position for the camera.
+        Sets a new goal position for the camera. The PID controller will try to make the camera (x,y) coords match this goal.
+
+        :param goal: An object with .x and .y attributes representing coordinates on the world raster.
         """
         self.goal_x = goal.x
         self.goal_y = goal.y
     
     def add_target(self, target: Point|Bot):
+        """Add an Point of Bot to the list of selectable targets that the player can choose the camera to track"""
         assert(hasattr(target, "x"))
         assert(hasattr(target, "y"))
         self.targets.append(target)
 
     def get_target(self):
+        """Returns the instance of the Point of Bot object that the camera is currently tracking"""
         return self.targets[self.target_index]
 
     def focus_next_target(self):
+        """Select the next tracking target to focus on from the `self.targets` list"""
         # increment the target inxex, but loop back to 0 if index overdlows
         # TODO: this should later make check if the entities have a data link
         # to determine if focus can be moved due to lore reasons.
@@ -85,6 +98,7 @@ class Camera:
         self.set_goal(self.targets[self.target_index])
 
     def focus_previous_target(self):
+        """Select the previous tracking target to focus on from the `self.targets` list"""
         # select the previous target
         self.target_index = self.target_index - 1
         # handle underflow for indexes < 0
