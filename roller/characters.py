@@ -55,7 +55,7 @@ Aros  = Spherebot(
     radius = 30,
     color = (10,10,10),
     sensors = [
-        sensors.SpectraScan_SX30(color=colors.orange, laser_count = 51),
+        sensors.SpectraScan_SX30(color=colors.orange, laser_count = 16),
         sensors.NAV1_InertiaCore(color=colors.orange),
     ],
     keybinds = {
