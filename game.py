@@ -288,8 +288,13 @@ if __name__ == "__main__":
 
         pygame.display.flip()  # Update the display
 
-        # Cap the frame rate
+        # when using cProfile to profile performance, quit after 10 seconds.
+        # this give easier to compare timing values, as the profiling
+        # period stays constant
+        if g_config.profiling and g_current_tick_ms > 20000:
+            RUNNING = False
 
+        # Cap the frame rate
         clock.tick(g_config.fps)
 
     # Clean up
