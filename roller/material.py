@@ -19,7 +19,7 @@ i.e. the pixel is completely opaque to light.
 255 means the pixel will never scatter."""
 
 def get_scattering_propability(pixel_color: tuple):
-    return 1 - color[SCATTERMAP / 255]
+    return (1 - pixel_color[SCATTERMAP] /255) **2
 
 def get_temperature_at(point: Point, world):
     pixel_color = world.surface.get_at((int(point.x),int(point.y)))
@@ -27,6 +27,6 @@ def get_temperature_at(point: Point, world):
     return temperature
 
 def is_light_scattering(pixel_color: tuple):
-    scattering_propability = 1 - pixel_color[SCATTERMAP] / 255
+    scattering_propability =  get_scattering_propability(pixel_color)
     return random.random() < scattering_propability
 

@@ -15,7 +15,18 @@ from roller.calculations import (
     world2screen
 )
 
+from enum import Enum, auto
 
+
+class RetensionPolicy(Enum):
+    ROUND_ROBIN = auto(),
+    """This indexing strategy always overwrites the oldest data entry with the latest entry.
+    This is a organized and visually clean looking data retension policy. Can make the bot appear
+    "snake like", as the data is deleted at the same pace that the bot is moving, following the bot like a trail. """
+
+    PICK_RANDOM = auto(),
+    """New data overwrites data at a random index. Has the possibility of retaining very old data
+    if they happen to not be overwritten. Visually slightly more chaotic."""
 
 @dataclass
 class Sensor:
@@ -28,24 +39,37 @@ class Sensor:
     heat_dissipation_rate:float = 0.1  # Example dissipation rate
 
     # Other attributes
-    color: tuple = colors.cyan
+    color: tuple[int,int,int] = colors.cyan
+    """RGB color tuple used to render the sensor's data to screen. Each color channel is a uint8_t (0-255)"""
     is_enabled:bool = True             # Whether the sensor is active
+    """An enabled sensor generates data, heat, and consumes power."""
     mount_angle: float = 0
 
     data: list = field(default_factory=list)
     """Each sensor subclass can determine themselves how to interact with the
     data buffer that has been provided for them. It may store Point's, """
-    dataindex:int = 0
-
+    data_index:int = 0
+    """Used to index self.data within the sensor"""
+    retension_policy: RetensionPolicy = RetensionPolicy.ROUND_ROBIN
+    """Determines how the sensor chooses what data do overwrite"""
+    retension_period: float = 20
+    """How many seconds of data fit in the data buffer at 100% duty cycle of the sensor.
+    data older than the retension period may be kept by choosing a suitable retension polixy"""
 
     #####################################
     ## Methods childred should implement
     #####################################3
     def run(self):
-        """This method will be implemented in specific sensor subclasses."""
+        """This method will be implemented in specific sensor subclasses.
+        
+        Intended for executing sensing logic for the sensor, and vizualizing it's data"""
         raise NotImplementedError("run must be implemented in subclasses.")
 
     def render(self, bot, world, screen):
+        """This method will be implemented in specific sensor subclasses.
+        
+        Used to draw the mounted sensor into the bot. i.e drawing operations that are not part of the sensor data
+        This function is called after the main body of the bot has already been drawn"""
         pass
 
     ######################
@@ -82,7 +106,6 @@ class Sensor:
             "temperature": self.temperature
         }
 
-
     def update_temperature(self, ambient_temperature:float, dt:float):
         # Calculate heat generated
         
@@ -97,24 +120,16 @@ class Sensor:
         # Update sensor temperature
         self.temperature += net_heat_change / (self.mass * self.heat_capacity)
 
-    def draw_data(self, world):
-        raise NotImplementedError
-
-    def delete_data(self, index:int, world):
-        raise NotImplementedError
-
-    def random_dataindex(self):
-        """choose the next index where lidar data will be written. How this is chosen
-        as a effect on how old data gets overwritten, which has aestethic importance"""
-        return random.randint(0, len(self.data)-1)
-
-    def next_dataindex(self):
-        """returns the incremented data index, and ensures that it wraps correctly when reaching maximum.
+    def next_data_index(self):
+        """returns the next data index ot be written to using the configured data retension policy.
+        Ensures that the index wraps correctly when reaching maximum.
         This indexing strategy always overwrites the oldest data entry, which can make the bot appear
         "snake like", as the data is deleted at the same pace that the bot is moving."""
-        return (self.dataindex + 1) % len(self.data)
-
-
+        if self.retension_policy == RetensionPolicy.ROUND_ROBIN:
+            return (self.data_index + 1) % len(self.data)
+        if self.retension_policy == RetensionPolicy.PICK_RANDOM:
+            return random.randint(0, len(self.data)-1)
+        raise NotImplementedError("Sensor retension policy not implemented")
 
 
 class Lidar(Sensor):
@@ -133,15 +148,25 @@ class Lidar(Sensor):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def draw_data(self, world):
+    def overwrite_data(self, data: list[Line], world: pygame.Surface):
         """Draw the visual prepresentation of the data in the sensor's data buffer
         onto the world interpretation surface"""
-        for line in self.data:
-            if not line:
-                continue
+        for line in data:
+
+            # Select the next index in the data buffer to be overwritten (selection method depends on aesthetic choices)
+            self.data_index = self.next_data_index()
+
+            # We erase the data visualization form the world Surface it's drawn on
+            
+            if self.data[self.data_index]:
+                pygame.draw.circle(world.interpretation, colors.black, self.data[self.data_index].end , 1)
+                if self.shows_rays:
+                    pygame.draw.line(world.interpretation, colors.black, self.data[self.data_index].start, self.data[self.data_index].end, 1)
+            
+            # We then store the new data element, and visualize it
+            self.data[self.data_index] = line
             pygame.draw.circle(world.interpretation, self.color, line.end, 1)
-            if self.shows_rays:
-                pygame.draw.line(world.interpretation, self.color + (30,), line.start, line.end, 1)
+            pygame.draw.line(world.interpretation, self.color + (30,), line.start, line.end, 1)
 
     
 # Specific sensor classes inheriting from the base Sensor class
@@ -156,13 +181,13 @@ class SpectraScan_LX1(Lidar):
         # SpectraScan_SX30-specific attribute
         self.range = range
         self.model: str = self.__class__.__name__
-        self.data = [None] * g_config.fps * 10
+        self.data = [None] * int(g_config.fps * self.retension_period)
+
 
     def run(self, bot, world):
         point = get_lidar_return(bot, self.range, self.mount_angle+bot.phi, world)
         if point:
-            self.data[self.dataindex] = Line(Point(bot.x,bot.y), point)
-            self.dataindex = self.next_dataindex()
+            self.overwrite_data([Line(Point(bot.x,bot.y), point)], world)
 
 class SpectraScan_SX30(Lidar):
     """Meet the SpectraScan-SX30 - your answer to getting lost and running into things! We took thirty of our trusty LX1 rangefinders, packed them into one powerful sensor array, and called it a day. Well... almost. Turns out, cramming that much tech makes it run a little toasty, we had to dial back the range a bit. But hey, it’s still a game-changer for up-close precision."""
@@ -177,19 +202,24 @@ class SpectraScan_SX30(Lidar):
         self.laser_count = laser_count
         self.model: str = self.__class__.__name__
         self.is_stabilized = is_stabilized
-        self.data = [None] * g_config.fps* 2 * self.laser_count
+        self.data = [None] * int(g_config.fps * self.laser_count * self.retension_period)
+
         #move to base class
 
     def run(self, bot, world):
+        data = []
         for theta in np.linspace(0, 2*math.pi, num=self.laser_count):
             # is the sensor does not have a stabilizer, it will
             # be co-rotating with with the body of the bot
             if not self.is_stabilized:
                 theta += bot.phi          
+
             point = get_lidar_return(bot, self.range, theta, world)
-            if point:
-                self.data[self.dataindex] = Line(Point(bot.x,bot.y),point)
-                self.dataindex = self.random_dataindex()
+            if point is None:
+                continue
+            line = Line(Point(bot.x, bot.y), point)
+            data.append(line)
+        self.overwrite_data(data, world)
 
 class FOTIRS(Sensor):
     """Introducing the Forward-Emitting Optical Terrain Illumination and Reflectivity Sensor (FOTIRS)—a precision-engineered light-based sensor designed to project a controlled beam forward and downward, scanning the terrain ahead for optimal navigation and environmental awareness."""
@@ -221,29 +251,25 @@ class NAV1_InertiaCore(Sensor):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.model = self.__class__.__name__
-        self.data = [None]*g_config.fps *20
+        self.data = [None]* int(g_config.fps * self.retension_period)
 
     def run(self, bot, world):
         """The Inertia Core measures the location it is mounted it, which co-rotates with the bot"""
-        self.dataindex = self.next_dataindex()
-        self.delete_data(self.dataindex, world)
+        self.data_index = self.next_data_index()
+        # erase any existing data form the current index
+        if self.data[self.data_index]:
+            world.interpretation.set_at(self.data[self.data_index], colors.black) 
+            pygame.draw.circle(world.interpretation, colors.black, self.data[self.data_index], 2)   
         sensor_location = get_line_endpoint(bot, bot.radius*4/5, bot.phi + self.mount_angle)
-        self.data[self.dataindex] = Point(int(sensor_location.x), int(sensor_location.y))
+        self.data[self.data_index] = Point(int(sensor_location.x), int(sensor_location.y))
 
-    def delete_data(self, index, world):
-        if self.data[index] is None:
-            return
-        world.interpretation.set_at(self.data[index], colors.black) 
-        self.data[index] = None
-
-    def draw_data(self, world):
-        world.interpretation.set_at(self.data[self.dataindex], self.color) 
-
+        # Visualize the data for the player
+        # world.interpretation.set_at(self.data[self.data_index], self.color) 
+        pygame.draw.circle(world.interpretation, self.color, self.data[self.data_index], 2)   
 
     def render(self, bot, world, screen):
         if not self.is_enabled:
             return
-        
         # the sensor size is radium/5 so scale appropriatly to the size of the bot
         # we add the mount angle to bot.phi so the sensor spins with the spherebot
         sensor_xy = get_line_endpoint(bot, bot.radius*4/5, bot.phi + self.mount_angle)

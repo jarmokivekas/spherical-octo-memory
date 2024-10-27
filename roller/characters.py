@@ -55,7 +55,7 @@ Aros  = Spherebot(
     radius = 30,
     color = (10,10,10),
     sensors = [
-        sensors.SpectraScan_SX30(color=colors.orange),
+        sensors.SpectraScan_SX30(color=colors.orange, laser_count = 51),
         sensors.NAV1_InertiaCore(color=colors.orange),
     ],
     keybinds = {
@@ -69,15 +69,7 @@ Aros.add_behaviour(
         bot = Aros,               # Aros is controlling itself
         sensor_index = 0,
         duty_cycle = 0.2,
-        period = 1,
-    )
-)
-Aros.add_behaviour(
-    behaviours.Blinking(
-        bot = Aros,               # Aros is controlling itself
-        sensor_index = 1,
-        duty_cycle = 0.2,
-        period = 1,
+        period = 0.5,
     )
 )
 
@@ -101,8 +93,8 @@ elevator1 = Elevator(
     y = places['map5.png']['elevator'][1],
     color = (50,50,50),
     sensors = [
-        sensors.SpectraScan_LX1(color=colors.Cyberpunk.yellow, mount_angle=math.pi/2),
-        sensors.SpectraScan_LX1(color=colors.Cyberpunk.yellow, mount_angle=3*math.pi/2),
+        sensors.SpectraScan_LX1(color=colors.Cyberpunk.yellow, retension_period = 0.5, mount_angle=math.pi/2),
+        sensors.SpectraScan_LX1(color=colors.Cyberpunk.yellow, retension_period = 0.5, mount_angle=3*math.pi/2),
     ]
 )
 elevator1.add_behaviour(

@@ -4,7 +4,7 @@ class GameConfig:
     """The acceleration for free gravity. Used in physics simulations. This should be meter/s, but is now still in pixels per frame"""
 
     ambient_temperature: float = 25
-    fps: int = 60
+    fps: int = 30
     """Target frames-per-second of the game tick. This is now a little bit hard-coded, since much of the physics is done per-frame.
     That means that the in the game time appears to slow down if you lower the FPS"""
 

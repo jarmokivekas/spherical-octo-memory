@@ -2,12 +2,16 @@ import pygame
 import json
 
 
-class Overlay:
-    def __init__(self, screen, font_size=14, font_color=(255, 255, 255), bg_alpha=0):
+class JsonOverlay:
+   
+    
+    
+    def __init__(self, screen:pygame.Surface, font_size=14, font_color=(255, 255, 255), bg_alpha=0):
         self.screen = screen
         self.font_size = font_size
         self.font_color = font_color
         self.bg_alpha = bg_alpha
+        # self.position = position
 
         # Set up font (can be customized)
 
@@ -28,8 +32,9 @@ class Overlay:
         # Create a transparent surface for the overlay
         text_overlay = pygame.Surface((self.screen.get_width(), len(lines) * self.font_size), pygame.SRCALPHA)
 
-        # Fill the surface with a semi-transparent background
-        text_overlay.fill((0, 0, 0, self.bg_alpha))
+        if self.bg_alpha != 0:
+            # Fill the surface with (semi)-transparent background
+            text_overlay.fill((0, 0, 0, self.bg_alpha))
 
         # Render each line of text
         y_offset = 0
@@ -52,7 +57,6 @@ class Overlay:
 
 
 
-import pygame
 
 class LinePlot:
     def __init__(self, surface, data, rect, line_color=(255, 165, 0), background_color=(0, 0, 0)):

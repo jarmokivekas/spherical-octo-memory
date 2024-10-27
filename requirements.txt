@@ -1,4 +1,6 @@
 pygame
 sphinx
-sphinx-apidoc
+# sphinx_apidoc
 sphinx-book-theme
+#json
+psutil

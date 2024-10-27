@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import pygame
 import math
 import numpy as np
@@ -9,8 +10,9 @@ from typing import List
 
 from roller.calculations import vectorProjection, scalarProduct, world2screen
 from roller.bots import Spherebot, Bot
-from roller.overlay import Overlay
+from roller.overlay import JsonOverlay
 from roller.conditions import g_player_conditions
+from roller.performance import g_performance
 from roller.datatypes import Point
 from roller.config import g_config
 from roller import colors
@@ -46,7 +48,6 @@ def drawWorld(world):
         for sensor in entity.sensors:
             if sensor.is_enabled:
                 sensor.run(entity, world)
-            sensor.draw_data(world)
     
     screen.blit(world.interpretation, (world.x, world.y))
 
@@ -177,7 +178,12 @@ def execute_tick(world, screen):
 
         entity.render(world,screen)
 
-    overlay.render_housekeeping(g_camera.targets[g_camera.target_index].get_housekeeping())
+    overlay_data = dict(
+        housekeeping = g_camera.targets[g_camera.target_index].get_housekeeping(),
+        preformance = g_performance.get_housekeeping(),
+    )
+    # overlay_data = g_camera.targets[g_camera.target_index].get_housekeeping()
+    overlay.render_housekeeping(overlay_data)
 
 
 
@@ -260,7 +266,7 @@ if __name__ == "__main__":
     world.memory.fill((0,0,0,0))
 
     # Create the overlay object jor displaying robot housekeeping
-    overlay = Overlay(screen)
+    overlay = JsonOverlay(screen)
 
     # contols which part of the world is rendered on screen
 
@@ -272,16 +278,18 @@ if __name__ == "__main__":
     while RUNNING:
         # Event handling
 
+        g_performance.start_tick()
+        g_performance.fps_avg = int(clock.get_fps())
         g_previous_tick_ms = g_current_tick_ms
         g_current_tick_ms = pygame.time.get_ticks()
         world.y +=1
-        # characters.player1.x += 1
-        # (draw your game objects here)
+
         execute_tick(world, screen)
 
         pygame.display.flip()  # Update the display
 
         # Cap the frame rate
+
         clock.tick(g_config.fps)
 
     # Clean up
